@@ -1,5 +1,5 @@
 # goclj
 
-A Go library for working with Clojure code.
+Go tools for working with Clojure code.
 
-So far, just a lexer. The rest of the parser coming soon.
+So far, a parser. [GoDoc](http://godoc.org/github.com/cespare/goclj/parse)
