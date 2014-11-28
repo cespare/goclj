@@ -46,17 +46,16 @@ func (t token) AsError() error {
 type tokType int
 
 const (
-	tokError tokType = iota // error; val is the error text
+	tokEOF tokType = iota
 
-	tokApostrophe  // '
-	tokAtSign      // @
-	tokBacktick    // `
-	tokBool        // true, false
-	tokCharLiteral // \c, \newline, etc
-	tokCircumflex  // ^
-	tokComment     // ; foobar
-	tokDispatch    // any dispatch macro token: #{, #(, #_, etc. Does not include tags.
-	tokEOF
+	tokApostrophe   // '
+	tokAtSign       // @
+	tokBacktick     // `
+	tokBool         // true, false
+	tokCharLiteral  // \c, \newline, etc
+	tokCircumflex   // ^
+	tokComment      // ; foobar
+	tokDispatch     // any dispatch macro token: #{, #(, #_, etc. Does not include tags.
 	tokKeyword      // :foo
 	tokLambdaArg    // %, %N
 	tokLeftBrace    // {
@@ -72,6 +71,8 @@ const (
 	tokSymbol       // foo
 	tokTilde        // ~
 	// TODO: include whitespace tokens?
+
+	tokError // error; val is the error text
 )
 
 var tokTypeToName = map[tokType]string{
@@ -258,6 +259,7 @@ func (l *lexer) run() {
 
 	for state := lexOuter; state != nil; state = state(l) {
 	}
+	close(l.tokens)
 }
 
 func lexOuter(l *lexer) stateFn {
@@ -368,6 +370,10 @@ func lexString(l *lexer) stateFn {
 }
 
 func lexCharLiteral(l *lexer) stateFn {
+	_, eof := l.next()
+	if eof {
+		return l.errorf("invalid character literal")
+	}
 	l.scanWhile(isSymbolChar)
 	l.emit(tokCharLiteral)
 	return lexOuter
@@ -433,7 +439,7 @@ func isSymbolChar(r rune) bool {
 		return true
 	}
 	switch r {
-	case '*', '+', '!', '-', '_', '?', '/', '.', ':':
+	case '*', '+', '!', '-', '_', '?', '/', '.', ':', '$', '=', '>', '<', '&':
 		return true
 	}
 	return false
