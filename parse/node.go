@@ -5,7 +5,6 @@ import "fmt"
 type Node interface {
 	Type() NodeType
 	Position() *Pos
-	// Print(w io.Writer) error // Recursive, formatted printing
 	String() string // A non-recursive string representation
 	Children() []Node
 }
@@ -25,6 +24,7 @@ const (
 	NodeList
 	NodeMap
 	NodeMetadata // ^form
+	NodeNewline
 	NodeNil
 	NodeNumber
 	NodeQuote // 'form
@@ -34,8 +34,6 @@ const (
 	NodeUnquote       // ~form
 	NodeUnquoteSplice // ~@form
 	NodeVector
-
-	NodeLambdaArg
 
 	// Dispatch macro forms.
 	NodeFnLiteral  // #(...)
@@ -72,6 +70,15 @@ type CharacterNode struct {
 func (n *CharacterNode) String() string   { return fmt.Sprintf("char(%q)", n.Val) }
 func (n *CharacterNode) Children() []Node { return nil }
 
+type CommentNode struct {
+	NodeType
+	*Pos
+	Text string
+}
+
+func (n *CommentNode) String() string   { return fmt.Sprintf("comment(%q)", n.Text) }
+func (n *CommentNode) Children() []Node { return nil }
+
 type DerefNode struct {
 	NodeType
 	*Pos
@@ -96,7 +103,9 @@ type ListNode struct {
 	Nodes []Node
 }
 
-func (n *ListNode) String() string   { return fmt.Sprintf("list(length=%d)", len(n.Nodes)) }
+func (n *ListNode) String() string {
+	return fmt.Sprintf("list(length=%d)", countSemantic(n.Nodes))
+}
 func (n *ListNode) Children() []Node { return n.Nodes }
 
 type MapNode struct {
@@ -105,7 +114,10 @@ type MapNode struct {
 	Nodes []Node
 }
 
-func (n *MapNode) String() string   { return fmt.Sprintf("map(length=%d)", len(n.Nodes)/2) }
+func (n *MapNode) String() string {
+	semanticNodes := countSemantic(n.Nodes)
+	return fmt.Sprintf("map(length=%d)", semanticNodes/2)
+}
 func (n *MapNode) Children() []Node { return n.Nodes }
 
 type MetadataNode struct {
@@ -116,6 +128,14 @@ type MetadataNode struct {
 
 func (n *MetadataNode) String() string   { return "metadata" }
 func (n *MetadataNode) Children() []Node { return []Node{n.Node} }
+
+type NewlineNode struct {
+	NodeType
+	*Pos
+}
+
+func (n *NewlineNode) String() string   { return "newline" }
+func (n *NewlineNode) Children() []Node { return nil }
 
 type NilNode struct {
 	NodeType
@@ -194,17 +214,10 @@ type VectorNode struct {
 	Nodes []Node
 }
 
-func (n *VectorNode) String() string   { return fmt.Sprintf("vector(length=%d)", len(n.Nodes)) }
-func (n *VectorNode) Children() []Node { return n.Nodes }
-
-type LambdaArgNode struct {
-	NodeType
-	*Pos
-	Val string
+func (n *VectorNode) String() string {
+	return fmt.Sprintf("vector(length=%d)", countSemantic(n.Nodes))
 }
-
-func (n *LambdaArgNode) String() string   { return fmt.Sprintf("lambda-arg(%s)", n.Val) }
-func (n *LambdaArgNode) Children() []Node { return nil }
+func (n *VectorNode) Children() []Node { return n.Nodes }
 
 type FnLiteralNode struct {
 	NodeType
@@ -212,7 +225,9 @@ type FnLiteralNode struct {
 	Nodes []Node
 }
 
-func (n *FnLiteralNode) String() string   { return fmt.Sprintf("lambda(length=%d)", len(n.Nodes)) }
+func (n *FnLiteralNode) String() string {
+	return fmt.Sprintf("lambda(length=%d)", countSemantic(n.Nodes))
+}
 func (n *FnLiteralNode) Children() []Node { return n.Nodes }
 
 type IgnoreFormNode struct {
@@ -239,7 +254,9 @@ type SetNode struct {
 	Nodes []Node
 }
 
-func (n *SetNode) String() string   { return fmt.Sprintf("set(length=%d)", len(n.Nodes)) }
+func (n *SetNode) String() string {
+	return fmt.Sprintf("set(length=%d)", countSemantic(n.Nodes))
+}
 func (n *SetNode) Children() []Node { return n.Nodes }
 
 type VarQuoteNode struct {
@@ -259,3 +276,21 @@ type TagNode struct {
 
 func (n *TagNode) String() string   { return fmt.Sprintf("tag(%s)", n.Val) }
 func (n *TagNode) Children() []Node { return nil }
+
+func isSemantic(n Node) bool {
+	switch n.Type() {
+	case NodeComment, NodeNewline:
+		return false
+	}
+	return true
+}
+
+func countSemantic(nodes []Node) int {
+	count := 0
+	for _, node := range nodes {
+		if isSemantic(node) {
+			count++
+		}
+	}
+	return count
+}

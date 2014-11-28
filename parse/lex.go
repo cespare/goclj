@@ -57,7 +57,6 @@ const (
 	tokComment      // ; foobar
 	tokDispatch     // any dispatch macro token: #{, #(, #_, etc. Does not include tags.
 	tokKeyword      // :foo
-	tokLambdaArg    // %, %N
 	tokLeftBrace    // {
 	tokLeftBracket  // [
 	tokLeftParen    // (
@@ -68,9 +67,9 @@ const (
 	tokRightBracket // ]
 	tokRightParen   // )
 	tokString       // string literal (java escapes)
-	tokSymbol       // foo
+	tokSymbol       // foo, also lambda args (%, %N)
 	tokTilde        // ~
-	// TODO: include whitespace tokens?
+	tokNewline
 
 	tokError // error; val is the error text
 )
@@ -87,7 +86,6 @@ var tokTypeToName = map[tokType]string{
 	tokEOF:          "eof",
 	tokError:        "error",
 	tokKeyword:      "keyword",
-	tokLambdaArg:    "lambda-arg",
 	tokLeftBrace:    "left-brace",
 	tokLeftBracket:  "left-bracket",
 	tokLeftParen:    "left-paren",
@@ -100,6 +98,7 @@ var tokTypeToName = map[tokType]string{
 	tokString:       "string",
 	tokSymbol:       "symbol",
 	tokTilde:        "tilde",
+	tokNewline:      "newline",
 }
 
 func (t tokType) String() string {
@@ -112,7 +111,7 @@ func (t tokType) String() string {
 
 func (t token) String() string {
 	switch t.typ {
-	case tokError, tokBool, tokCharLiteral, tokComment, tokKeyword, tokLambdaArg, tokNumber, tokDispatch, tokString, tokSymbol:
+	case tokError, tokBool, tokCharLiteral, tokComment, tokKeyword, tokNumber, tokDispatch, tokString, tokSymbol:
 		return fmt.Sprintf("<%s@%s>(%q)", t.typ, t.pos, t.val)
 	}
 	return fmt.Sprintf("<%s@%s>", t.typ, t.pos)
@@ -146,9 +145,6 @@ type inputReadErr struct {
 }
 
 func (l *lexer) next() (r rune, eof bool) {
-	//defer func() {
-	//fmt.Printf("next: %q, eof=%t, pos=%s, start=%s, lastPos=%s\n", r, eof, l.pos, l.start, l.lastPos)
-	//}()
 	r, w, err := l.input.ReadRune()
 	if err != nil {
 		if err == io.EOF {
@@ -194,7 +190,7 @@ func (l *lexer) scanWhile(f func(r rune) bool) {
 	}
 }
 
-// scanUntil scans until a rune in set is reached (or EOF). It consumes the discovered element of set, if any.
+// scanUntil scans until a rune in set is reached (or EOF). It does not consume the discovered rune.
 func (l *lexer) scanUntil(set string) {
 	runes := []rune(set)
 	for {
@@ -204,6 +200,7 @@ func (l *lexer) scanUntil(set string) {
 		}
 		for _, r2 := range runes {
 			if r == r2 {
+				l.back()
 				return
 			}
 		}
@@ -278,7 +275,8 @@ func lexOuter(l *lexer) stateFn {
 	case ':':
 		return lexKeyword
 	case '%':
-		return lexLambdaArg
+		// Symbols can only begin with %; not allowed in the middle.
+		return lexSymbol
 	case '#':
 		return lexDispatch
 	case '+', '-':
@@ -318,6 +316,8 @@ func lexOuter(l *lexer) stateFn {
 		l.emit(tokRightParen)
 	case '~':
 		l.emit(tokTilde)
+	case '\n':
+		l.emit(tokNewline)
 	default:
 		goto afterSingles
 	}
@@ -385,12 +385,6 @@ func lexKeyword(l *lexer) stateFn {
 	return lexOuter
 }
 
-func lexLambdaArg(l *lexer) stateFn {
-	l.scanWhile(isSymbolChar)
-	l.emit(tokLambdaArg)
-	return lexOuter
-}
-
 func lexDispatch(l *lexer) stateFn {
 	// Dispatch is tricky. '#foo" and '# foo' are both interpeted as the tag 'foo'. However, '# _' is not
 	// interpreted as the ignore macro -- it is the tag '_'. (So the whitespace matters when tokenizing a
@@ -430,7 +424,7 @@ func lexSymbol(l *lexer) stateFn {
 }
 
 func isWhitespace(r rune) bool {
-	return unicode.IsSpace(r) || r == ','
+	return (unicode.IsSpace(r) && r != '\n') || r == ','
 }
 
 // Decent approximation for now

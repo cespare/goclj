@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -12,6 +11,9 @@ import (
 
 type Tree struct {
 	Roots []Node
+
+	// Config
+	includeNonSemantic bool
 
 	// Parser state
 	tok       token // single-item lookahead
@@ -41,7 +43,9 @@ func (t *Tree) Parse() (err error) {
 		if node == nil {
 			break
 		}
-		t.Roots = append(t.Roots, node)
+		if t.includeNonSemantic || isSemantic(node) {
+			t.Roots = append(t.Roots, node)
+		}
 	}
 	return nil
 }
@@ -102,16 +106,19 @@ func (t *Tree) unexpected(tok token) { t.errorf(tok.pos, "unexpected token %q", 
 
 func (t *Tree) unexpectedEOF(tok token) { t.errorf(tok.pos, "unexpected EOF") }
 
-func ParseFile(filename string) {
+func ParseFile(filename string) (*Tree, error) {
 	f, err := os.Open(filename)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	t := &Tree{lex: lex(filename, bufio.NewReader(f))}
+	t := &Tree{
+		includeNonSemantic: false,
+		lex:                lex(filename, bufio.NewReader(f)),
+	}
 	if err := t.Parse(); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	fmt.Print(t.String())
+	return t, nil
 }
 
 // parse parses the next top-level item from the token stream. It returns nil if there are no non-EOF tokens
@@ -131,8 +138,7 @@ func (t *Tree) parse() Node {
 		case tokCharLiteral:
 			return t.parseCharLiteral(tok)
 		case tokComment:
-			// TODO: option to save
-			continue
+			return &CommentNode{NodeComment, tok.pos, tok.val}
 		case tokAtSign:
 			return &DerefNode{NodeDeref, tok.pos, t.parse()}
 		case tokKeyword:
@@ -143,6 +149,8 @@ func (t *Tree) parse() Node {
 			return t.parseMap(tok)
 		case tokCircumflex:
 			return &MetadataNode{NodeMetadata, tok.pos, t.parse()}
+		case tokNewline:
+			return &NewlineNode{NodeNewline, tok.pos}
 		case tokNumber:
 			// TODO: need to parse the number here; a number token may not be valid.
 			return &NumberNode{NodeNumber, tok.pos, tok.val}
@@ -164,12 +172,6 @@ func (t *Tree) parse() Node {
 			return &UnquoteNode{NodeUnquote, tok.pos, t.parse()}
 		case tokLeftBracket:
 			return t.parseVector(tok)
-		case tokLambdaArg:
-			if t.inLambda {
-				return &LambdaArgNode{NodeLambdaArg, tok.pos, tok.val}
-			} else {
-				t.errorf(tok.pos, "lambda arg not inside function literal")
-			}
 		case tokDispatch:
 			return t.parseDispatch(tok)
 		case tokOctothorpe:
@@ -238,7 +240,10 @@ func (t *Tree) parseList(start token) Node {
 			t.unexpectedEOF(tok)
 		}
 		t.backup()
-		nodes = append(nodes, t.parse())
+		node := t.parse()
+		if t.includeNonSemantic || isSemantic(node) {
+			nodes = append(nodes, node)
+		}
 	}
 }
 
@@ -252,7 +257,10 @@ func (t *Tree) parseMap(start token) Node {
 			t.unexpectedEOF(tok)
 		}
 		t.backup()
-		nodes = append(nodes, t.parse(), t.parse())
+		node := t.parse()
+		if t.includeNonSemantic || isSemantic(node) {
+			nodes = append(nodes, node)
+		}
 	}
 }
 
@@ -266,7 +274,10 @@ func (t *Tree) parseVector(start token) Node {
 			t.unexpectedEOF(tok)
 		}
 		t.backup()
-		nodes = append(nodes, t.parse())
+		node := t.parse()
+		if t.includeNonSemantic || isSemantic(node) {
+			nodes = append(nodes, node)
+		}
 	}
 }
 
@@ -320,7 +331,10 @@ func (t *Tree) parseFnLiteral(start token) Node {
 			t.unexpectedEOF(tok)
 		}
 		t.backup()
-		nodes = append(nodes, t.parse())
+		node := t.parse()
+		if t.includeNonSemantic || isSemantic(node) {
+			nodes = append(nodes, node)
+		}
 	}
 }
 
@@ -359,7 +373,10 @@ func (t *Tree) parseSet(start token) Node {
 			t.unexpectedEOF(tok)
 		}
 		t.backup()
-		nodes = append(nodes, t.parse())
+		node := t.parse()
+		if t.includeNonSemantic || isSemantic(node) {
+			nodes = append(nodes, node)
+		}
 	}
 }
 
