@@ -227,7 +227,7 @@ func (t *Tree) parseCharLiteral(tok token) Node {
 			}
 		}
 	}
-	return &CharacterNode{tok.pos, r}
+	return &CharacterNode{tok.pos, r, tok.val}
 }
 
 func (t *Tree) parseList(start token) Node {

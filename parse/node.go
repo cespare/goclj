@@ -2,6 +2,33 @@ package parse
 
 import "fmt"
 
+/*
+BoolNode
+CharacterNode
+CommentNode
+DerefNode
+FnLiteralNode
+IgnoreFormNode
+KeywordNode
+ListNode
+MapNode
+MetadataNode
+NewlineNode
+NilNode
+NumberNode
+QuoteNode
+RegexNode
+SetNode
+StringNode
+SymbolNode
+SyntaxQuoteNode
+TagNode
+UnquoteNode
+UnquoteSpliceNode
+VarQuoteNode
+VectorNode
+*/
+
 type Node interface {
 	Position() *Pos
 	String() string // A non-recursive string representation
@@ -26,7 +53,8 @@ func (n *BoolNode) Children() []Node { return nil }
 
 type CharacterNode struct {
 	*Pos
-	Val rune
+	Val  rune
+	Text string
 }
 
 func (n *CharacterNode) String() string   { return fmt.Sprintf("char(%q)", n.Val) }
