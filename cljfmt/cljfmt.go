@@ -13,11 +13,6 @@ import (
 	"github.com/cespare/goclj/parse"
 )
 
-// TODO: Finish unhandled node types
-// TODO: indent special fns/forms (e.g. ns, defn, ...) only two
-// TODO: Indent paired vec forms (like let) correctly
-// TODO: Split up lines of doc comments and indent properly
-
 func PrintTree(w io.Writer, t *parse.Tree) (err error) {
 	bw := &bufWriter{bufio.NewWriter(w)}
 	defer func() {
