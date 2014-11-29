@@ -1,9 +1,9 @@
 (ns example
     (:require [a :as b]
-              [c :refer [d e f]])
-    (:import g
-             (h.i.j.K)
-             [l.m.n O]))
+                [c :refer [d e f]])
+      (:import g
+               (h.i.j.K)
+               [l.m.n O]))
 
 (def blah
      (let [a

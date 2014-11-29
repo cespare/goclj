@@ -7,10 +7,17 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/cespare/diff"
 	"github.com/cespare/goclj/parse"
+)
+
+var (
+	indentSpecial = regexp.MustCompile(
+		"^(ns|with.*|def.*|let.*|send.*)$",
+	)
 )
 
 func PrintTree(w io.Writer, t *parse.Tree) (err error) {
@@ -159,6 +166,9 @@ func IndentWidth(node parse.Node) int {
 	case *parse.NumberNode:
 		return len(node.Val) + 1
 	case *parse.SymbolNode:
+		if indentSpecial.MatchString(node.Val) {
+			return 1
+		}
 		return len(node.Val) + 1
 	case *parse.QuoteNode:
 		return 1 + IndentWidth(node.Node)
