@@ -47,7 +47,12 @@ func PrintNode(w *bufWriter, node parse.Node, indent int) {
 		w.WriteByte('@')
 		PrintNode(w, node.Node, indent+1)
 	case *parse.FnLiteralNode:
+		w.WriteString("#(")
+		PrintSequence(w, node.Nodes, indent+2, true)
+		w.WriteString(")")
 	case *parse.IgnoreFormNode:
+		w.WriteString("#_")
+		PrintNode(w, node.Node, indent+2)
 	case *parse.KeywordNode:
 		w.WriteString(node.Val)
 	case *parse.ListNode:
@@ -59,23 +64,40 @@ func PrintNode(w *bufWriter, node parse.Node, indent int) {
 		PrintSequence(w, node.Nodes, indent+1, false)
 		w.WriteString("}")
 	case *parse.MetadataNode:
+		w.WriteByte('^')
+		PrintNode(w, node.Node, indent+1)
 	case *parse.NewlineNode:
 		panic("should not happen")
 	case *parse.NilNode:
+		w.WriteString("nil")
 	case *parse.NumberNode:
 		w.WriteString(node.Val)
 	case *parse.QuoteNode:
+		w.WriteByte('\'')
+		PrintNode(w, node.Node, indent+1)
 	case *parse.RegexNode:
+		w.WriteString(`#"` + node.Val + `"`)
 	case *parse.SetNode:
+		w.WriteString("#{")
+		PrintSequence(w, node.Nodes, indent+2, false)
+		w.WriteString("}")
 	case *parse.StringNode:
 		w.WriteString(`"` + node.Val + `"`)
 	case *parse.SymbolNode:
 		w.WriteString(node.Val)
 	case *parse.SyntaxQuoteNode:
+		w.WriteByte('`')
+		PrintNode(w, node.Node, indent+1)
 	case *parse.TagNode:
+		w.WriteString("#" + node.Val)
 	case *parse.UnquoteNode:
+		w.WriteByte('~')
+		PrintNode(w, node.Node, indent+1)
 	case *parse.UnquoteSpliceNode:
+		w.WriteString("~@")
+		PrintNode(w, node.Node, indent+2)
 	case *parse.VarQuoteNode:
+		w.WriteString("#'" + node.Val)
 	case *parse.VectorNode:
 		w.WriteString("[")
 		PrintSequence(w, node.Nodes, indent+1, false)
@@ -85,7 +107,6 @@ func PrintNode(w *bufWriter, node parse.Node, indent int) {
 	}
 }
 
-// -1 indent => don't indent
 func PrintSequence(w *bufWriter, nodes []parse.Node, indent int, listIndent bool) {
 	newline := false
 	for i, n := range nodes {
@@ -95,7 +116,7 @@ func PrintSequence(w *bufWriter, nodes []parse.Node, indent int, listIndent bool
 			continue
 		}
 		if listIndent && i == 1 {
-			indent += PrintWidth(nodes[0]) + 1
+			indent += IndentWidth(nodes[0])
 		}
 		if newline {
 			w.WriteString(strings.Repeat(indentChar, indent))
@@ -107,53 +128,56 @@ func PrintSequence(w *bufWriter, nodes []parse.Node, indent int, listIndent bool
 	}
 }
 
-func PrintWidth(node parse.Node) int {
+// IndentWidth is the width of a form for the purposes of indenting the next line.
+// For 'simple' forms (symbols, keywords, ...) the width includes one extra
+// at the end for the following space.
+func IndentWidth(node parse.Node) int {
 	switch node := node.(type) {
 	case *parse.BoolNode:
 		if node.Val {
-			return 4
+			return 5
 		}
-		return 5
+		return 6
 	case *parse.CharacterNode:
-		return 1 // Not going to worry about multiwidth chars
+		return 2 // Not going to worry about multiwidth chars
 	case *parse.CommentNode:
 		return 0
 	case *parse.DerefNode:
-		return 1 + PrintWidth(node.Node)
+		return 1 + IndentWidth(node.Node)
 	case *parse.KeywordNode:
-		return len(node.Val)
+		return len(node.Val) + 1
 	case *parse.ListNode:
 		return 2
 	case *parse.MapNode:
 		return 2
 	case *parse.MetadataNode:
-		return 1 + PrintWidth(node.Node)
+		return 1 + IndentWidth(node.Node)
 	case *parse.NewlineNode:
 		return 0
 	case *parse.NilNode:
-		return 3
+		return 4
 	case *parse.NumberNode:
-		return len(node.Val)
+		return len(node.Val) + 1
 	case *parse.SymbolNode:
-		return len(node.Val)
+		return len(node.Val) + 1
 	case *parse.QuoteNode:
-		return 1 + PrintWidth(node.Node)
+		return 1 + IndentWidth(node.Node)
 	case *parse.StringNode:
-		return 2 + len(node.Val)
+		return 3 + len(node.Val)
 	case *parse.SyntaxQuoteNode:
-		return 1 + PrintWidth(node.Node)
+		return 1 + IndentWidth(node.Node)
 	case *parse.UnquoteNode:
-		return 1 + PrintWidth(node.Node)
+		return 1 + IndentWidth(node.Node)
 	case *parse.UnquoteSpliceNode:
-		return 1 + PrintWidth(node.Node)
+		return 1 + IndentWidth(node.Node)
 	case *parse.VectorNode:
 		return 2
 	case *parse.FnLiteralNode:
 		return 2
 	case *parse.IgnoreFormNode:
-		return 2 + PrintWidth(node.Node)
+		return 2 + IndentWidth(node.Node)
 	case *parse.RegexNode:
-		return 3 + len(node.Val)
+		return 4 + len(node.Val)
 	case *parse.SetNode:
 		return 2
 	case *parse.VarQuoteNode:

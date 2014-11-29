@@ -9,8 +9,13 @@
      (let [a
            (foobar blah)
            \b @xyz]
+       (foo #(x y z)
+            blah
+            asdf)
           {:foo 1
-           :bar 2}))
+           :bar 2}
+          #{a b
+            c d}))
 
 (defn f
       "this is a fn
@@ -19,4 +24,5 @@
       [x y z]
       (+ x
          y
-         z))
+         z)
+      'a #'b ~c ~@d #e/f `g)

@@ -404,6 +404,8 @@ func lexDispatch(l *lexer) stateFn {
 	case '{', '(', '\'', '"', '_':
 		l.synth(tokDispatch, val)
 		return lexOuter
+	default:
+		l.emit(tokOctothorpe)
 	}
 	return lexOuter
 }
