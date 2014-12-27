@@ -1,15 +1,14 @@
 (ns example
     (:require [a :as b]
-                [c :refer [d e f]])
-      (:import g
-               (h.i.j.K)
-               [l.m.n O]))
+                     [c :refer [d e f]])
+          (:import g
+                   (h.i.j.K)
+                          [l.m.n O]))
 
 (def blah
-     (let [a
-           (foobar blah)
-           \b @xyz]
-       (foo #(x y z)
+     (let [a (    foobar         blah)
+           \b @     xyz]
+        (foo #(x y z)
             blah
             asdf)
           {:foo 1
