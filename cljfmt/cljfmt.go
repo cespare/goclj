@@ -16,7 +16,7 @@ import (
 
 var (
 	indentSpecial = regexp.MustCompile(
-		"^(ns|with.*|def.*|let.*|send.*)$",
+		"^(doto|if|ns|with.*|def.*|let.*|send.*)$",
 	)
 )
 
@@ -115,7 +115,6 @@ func PrintNode(w *bufWriter, node parse.Node, indent int) {
 }
 
 func PrintSequence(w *bufWriter, nodes []parse.Node, indent int, listIndent bool) {
-	fmt.Printf("\033[01;34m>>>> indent: %v\x1B[m\n", indent)
 	newline := false
 	subIndent := indent
 	for i, n := range nodes {
@@ -125,36 +124,18 @@ func PrintSequence(w *bufWriter, nodes []parse.Node, indent int, listIndent bool
 			newline = true
 			continue
 		}
+		if listIndent && i == 1 {
+			indent += ListIndentWidth(nodes[0])
+		}
 		if newline {
 			w.WriteString(strings.Repeat(indentChar, indent))
 			newline = false
 		} else if i > 0 {
 			w.WriteByte(' ')
-			subIndent++
 		}
-		fmt.Printf("\033[01;34m>>>> subIndent: %v\x1B[m\n", subIndent)
 		PrintNode(w, n, subIndent)
 		subIndent += IndentWidth(n)
 	}
-
-	//newline := false
-	//for i, n := range nodes {
-	//if _, ok := n.(*parse.NewlineNode); ok {
-	//w.WriteByte('\n')
-	//newline = true
-	//continue
-	//}
-	//if listIndent && i == 1 {
-	//indent += IndentWidth(nodes[0])
-	//}
-	//if newline {
-	//w.WriteString(strings.Repeat(indentChar, indent))
-	//newline = false
-	//} else if i > 0 {
-	//w.WriteByte(' ')
-	//}
-	//PrintNode(w, n, indent)
-	//}
 }
 
 // IndentWidth is the width of a form for the purposes of indenting the next line.
@@ -174,8 +155,6 @@ func IndentWidth(node parse.Node) int {
 	case *parse.DerefNode:
 		return 1 + IndentWidth(node.Node)
 	case *parse.KeywordNode:
-		fmt.Printf("\033[01;34m>>>> len(node.Val): %v\x1B[m\n", len(node.Val))
-		fmt.Printf("\033[01;34m>>>> node.Val: %v\x1B[m\n", node.Val)
 		return len(node.Val) + 1
 	case *parse.ListNode:
 		return 2
@@ -190,9 +169,6 @@ func IndentWidth(node parse.Node) int {
 	case *parse.NumberNode:
 		return len(node.Val) + 1
 	case *parse.SymbolNode:
-		if indentSpecial.MatchString(node.Val) {
-			return 1
-		}
 		return len(node.Val) + 1
 	case *parse.QuoteNode:
 		return 1 + IndentWidth(node.Node)
@@ -220,6 +196,15 @@ func IndentWidth(node parse.Node) int {
 		return 1 + len(node.Val)
 	}
 	panic("unreached")
+}
+
+func ListIndentWidth(node parse.Node) int {
+	if node, ok := node.(*parse.SymbolNode); ok {
+		if indentSpecial.MatchString(node.Val) {
+			return 1
+		}
+	}
+	return IndentWidth(node)
 }
 
 type bufWriter struct {
