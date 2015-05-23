@@ -14,12 +14,6 @@ import (
 	"github.com/cespare/goclj/parse"
 )
 
-var (
-	indentSpecial = regexp.MustCompile(
-		"^(doto|if|ns|with.*|def.*|let.*|send.*)$",
-	)
-)
-
 func PrintTree(w io.Writer, t *parse.Tree) (err error) {
 	bw := &bufWriter{bufio.NewWriter(w)}
 	defer func() {
@@ -201,8 +195,16 @@ func IndentWidth(node parse.Node) int {
 	panic("unreached")
 }
 
+var indentSpecial = regexp.MustCompile(
+	`^(def.*|let.*|send.*|when.*|with.*)$`,
+)
+
 func ListIndentWidth(node parse.Node) int {
 	if node, ok := node.(*parse.SymbolNode); ok {
+		switch node.Val {
+		case "catch", "doto", "if", "loop", "ns":
+			return 1
+		}
 		if indentSpecial.MatchString(node.Val) {
 			return 1
 		}
