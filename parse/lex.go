@@ -435,7 +435,7 @@ func isSymbolChar(r rune) bool {
 		return true
 	}
 	switch r {
-	case '*', '+', '!', '-', '_', '?', '/', '.', ':', '$', '=', '>', '<', '&':
+	case '*', '+', '!', '-', '_', '?', '/', '.', ':', '$', '=', '>', '<', '&', '#':
 		return true
 	}
 	return false
