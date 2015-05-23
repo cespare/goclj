@@ -120,6 +120,9 @@ func PrintSequence(w *bufWriter, nodes []parse.Node, indent int, listIndent bool
 	for i, n := range nodes {
 		if _, ok := n.(*parse.NewlineNode); ok {
 			w.WriteByte('\n')
+			if listIndent && i == 1 {
+				indent++
+			}
 			subIndent = indent
 			newline = true
 			continue
