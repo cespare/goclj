@@ -16,13 +16,13 @@ import (
 
 type Printer struct {
 	*bufWriter
-	indentChar byte
+	IndentChar byte
 }
 
-func NewPrinter(w io.Writer, indentChar byte) *Printer {
+func NewPrinter(w io.Writer) *Printer {
 	return &Printer{
 		bufWriter:  &bufWriter{bufio.NewWriter(w)},
-		indentChar: indentChar,
+		IndentChar: ' ',
 	}
 }
 
@@ -136,7 +136,7 @@ func (p *Printer) PrintSequence(nodes []parse.Node, indent int, listIndent bool)
 			indent += ListIndentWidth(nodes[0])
 		}
 		if newline {
-			p.WriteString(strings.Repeat(string(p.indentChar), indent))
+			p.WriteString(strings.Repeat(string(p.IndentChar), indent))
 			newline = false
 		} else if i > 0 {
 			p.WriteByte(' ')
@@ -285,7 +285,9 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
-	if err := NewPrinter(os.Stdout, indentChar).PrintTree(t); err != nil {
+	p := NewPrinter(os.Stdout)
+	p.IndentChar = indentChar
+	if err := p.PrintTree(t); err != nil {
 		fatal(err)
 	}
 }
@@ -302,7 +304,9 @@ func writeFormatted(filename string, indentChar byte, listDifferent, writeFile b
 	if err != nil {
 		return err
 	}
-	if err := NewPrinter(tw, indentChar).PrintTree(t); err != nil {
+	p := NewPrinter(tw)
+	p.IndentChar = indentChar
+	if err := p.PrintTree(t); err != nil {
 		return err
 	}
 	tw.Close()
