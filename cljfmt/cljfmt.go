@@ -14,8 +14,19 @@ import (
 	"github.com/cespare/goclj/parse"
 )
 
-func PrintTree(w io.Writer, t *parse.Tree) (err error) {
-	bw := &bufWriter{bufio.NewWriter(w)}
+type Printer struct {
+	*bufWriter
+	indentChar byte
+}
+
+func NewPrinter(w io.Writer, indentChar byte) *Printer {
+	return &Printer{
+		bufWriter:  &bufWriter{bufio.NewWriter(w)},
+		indentChar: indentChar,
+	}
+}
+
+func (p *Printer) PrintTree(t *parse.Tree) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
 			switch e := e.(type) {
@@ -28,92 +39,92 @@ func PrintTree(w io.Writer, t *parse.Tree) (err error) {
 			}
 		}
 	}()
-	PrintSequence(bw, t.Roots, 0, false)
-	return bw.bw.Flush()
+	p.PrintSequence(t.Roots, 0, false)
+	return p.bw.Flush()
 }
 
-func PrintNode(w *bufWriter, node parse.Node, indent int) {
+func (p *Printer) PrintNode(node parse.Node, indent int) {
 	switch node := node.(type) {
 	case *parse.BoolNode:
 		if node.Val {
-			w.WriteString("true")
+			p.WriteString("true")
 		} else {
-			w.WriteString("false")
+			p.WriteString("false")
 		}
 	case *parse.CharacterNode:
-		w.WriteString(node.Text)
+		p.WriteString(node.Text)
 	case *parse.CommentNode:
-		w.WriteString(node.Text)
+		p.WriteString(node.Text)
 	case *parse.DerefNode:
-		w.WriteByte('@')
-		PrintNode(w, node.Node, indent+1)
+		p.WriteByte('@')
+		p.PrintNode(node.Node, indent+1)
 	case *parse.FnLiteralNode:
-		w.WriteString("#(")
-		PrintSequence(w, node.Nodes, indent+2, true)
-		w.WriteString(")")
+		p.WriteString("#(")
+		p.PrintSequence(node.Nodes, indent+2, true)
+		p.WriteString(")")
 	case *parse.IgnoreFormNode:
-		w.WriteString("#_")
-		PrintNode(w, node.Node, indent+2)
+		p.WriteString("#_")
+		p.PrintNode(node.Node, indent+2)
 	case *parse.KeywordNode:
-		w.WriteString(node.Val)
+		p.WriteString(node.Val)
 	case *parse.ListNode:
-		w.WriteString("(")
-		PrintSequence(w, node.Nodes, indent+1, true)
-		w.WriteString(")")
+		p.WriteString("(")
+		p.PrintSequence(node.Nodes, indent+1, true)
+		p.WriteString(")")
 	case *parse.MapNode:
-		w.WriteString("{")
-		PrintSequence(w, node.Nodes, indent+1, false)
-		w.WriteString("}")
+		p.WriteString("{")
+		p.PrintSequence(node.Nodes, indent+1, false)
+		p.WriteString("}")
 	case *parse.MetadataNode:
-		w.WriteByte('^')
-		PrintNode(w, node.Node, indent+1)
+		p.WriteByte('^')
+		p.PrintNode(node.Node, indent+1)
 	case *parse.NewlineNode:
 		panic("should not happen")
 	case *parse.NilNode:
-		w.WriteString("nil")
+		p.WriteString("nil")
 	case *parse.NumberNode:
-		w.WriteString(node.Val)
+		p.WriteString(node.Val)
 	case *parse.QuoteNode:
-		w.WriteByte('\'')
-		PrintNode(w, node.Node, indent+1)
+		p.WriteByte('\'')
+		p.PrintNode(node.Node, indent+1)
 	case *parse.RegexNode:
-		w.WriteString(`#"` + node.Val + `"`)
+		p.WriteString(`#"` + node.Val + `"`)
 	case *parse.SetNode:
-		w.WriteString("#{")
-		PrintSequence(w, node.Nodes, indent+2, false)
-		w.WriteString("}")
+		p.WriteString("#{")
+		p.PrintSequence(node.Nodes, indent+2, false)
+		p.WriteString("}")
 	case *parse.StringNode:
-		w.WriteString(`"` + node.Val + `"`)
+		p.WriteString(`"` + node.Val + `"`)
 	case *parse.SymbolNode:
-		w.WriteString(node.Val)
+		p.WriteString(node.Val)
 	case *parse.SyntaxQuoteNode:
-		w.WriteByte('`')
-		PrintNode(w, node.Node, indent+1)
+		p.WriteByte('`')
+		p.PrintNode(node.Node, indent+1)
 	case *parse.TagNode:
-		w.WriteString("#" + node.Val)
+		p.WriteString("#" + node.Val)
 	case *parse.UnquoteNode:
-		w.WriteByte('~')
-		PrintNode(w, node.Node, indent+1)
+		p.WriteByte('~')
+		p.PrintNode(node.Node, indent+1)
 	case *parse.UnquoteSpliceNode:
-		w.WriteString("~@")
-		PrintNode(w, node.Node, indent+2)
+		p.WriteString("~@")
+		p.PrintNode(node.Node, indent+2)
 	case *parse.VarQuoteNode:
-		w.WriteString("#'" + node.Val)
+		p.WriteString("#'" + node.Val)
 	case *parse.VectorNode:
-		w.WriteString("[")
-		PrintSequence(w, node.Nodes, indent+1, false)
-		w.WriteString("]")
+		p.WriteString("[")
+		p.PrintSequence(node.Nodes, indent+1, false)
+		p.WriteString("]")
 	default:
 		FmtErrf("%s: unhandled node type %T", node.Position(), node)
 	}
 }
 
-func PrintSequence(w *bufWriter, nodes []parse.Node, indent int, listIndent bool) {
+func (p *Printer) PrintSequence(nodes []parse.Node, indent int, listIndent bool) {
 	newline := false
 	subIndent := indent
 	for i, n := range nodes {
 		if _, ok := n.(*parse.NewlineNode); ok {
-			w.WriteByte('\n')
+			p.WriteByte('\n')
 			if listIndent && i == 1 {
 				indent++
 			}
@@ -125,12 +136,12 @@ func PrintSequence(w *bufWriter, nodes []parse.Node, indent int, listIndent bool
 			indent += ListIndentWidth(nodes[0])
 		}
 		if newline {
-			w.WriteString(strings.Repeat(indentChar, indent))
+			p.WriteString(strings.Repeat(string(p.indentChar), indent))
 			newline = false
 		} else if i > 0 {
-			w.WriteByte(' ')
+			p.WriteByte(' ')
 		}
-		PrintNode(w, n, subIndent)
+		p.PrintNode(n, subIndent)
 		subIndent += IndentWidth(n)
 	}
 }
@@ -243,24 +254,23 @@ func FmtErrf(format string, args ...interface{}) {
 	panic(fmtErr(fmt.Sprintf(format, args...)))
 }
 
-var (
-	indentChar string
-)
-
 func main() {
-	flag.StringVar(&indentChar, "indent-char", " ", "character to use for indenting")
-	listDifferent := flag.Bool("l", false, "print files whose formatting differs from cljfmt's")
-	writeFile := flag.Bool("w", false, "write result to (source) file instead of stdout")
+	var (
+		indentCharFlag = flag.String("indentchar", " ", "character to use for indenting")
+		listDifferent  = flag.Bool("l", false, "print files whose formatting differs from cljfmt's")
+		writeFile      = flag.Bool("w", false, "write result to (source) file instead of stdout")
+	)
 	flag.Parse()
-	if len(indentChar) != 1 {
-		fatalf("-indent-char arg must have length 1")
+	if len(*indentCharFlag) != 1 {
+		fatalf("-indentchar arg must have length 1")
 	}
+	indentChar := (*indentCharFlag)[0]
 	if flag.NArg() < 1 {
 		usage()
 	}
 	if *listDifferent || *writeFile {
 		for _, filename := range flag.Args() {
-			if err := writeFormatted(filename, *listDifferent, *writeFile); err != nil {
+			if err := writeFormatted(filename, indentChar, *listDifferent, *writeFile); err != nil {
 				fatal(err)
 			}
 		}
@@ -275,12 +285,12 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
-	if err := PrintTree(os.Stdout, t); err != nil {
+	if err := NewPrinter(os.Stdout, indentChar).PrintTree(t); err != nil {
 		fatal(err)
 	}
 }
 
-func writeFormatted(filename string, listDifferent, writeFile bool) error {
+func writeFormatted(filename string, indentChar byte, listDifferent, writeFile bool) error {
 	tw, err := ioutil.TempFile("", "cljfmt-")
 	if err != nil {
 		return err
@@ -292,7 +302,7 @@ func writeFormatted(filename string, listDifferent, writeFile bool) error {
 	if err != nil {
 		return err
 	}
-	if err := PrintTree(tw, t); err != nil {
+	if err := NewPrinter(tw, indentChar).PrintTree(t); err != nil {
 		return err
 	}
 	tw.Close()
