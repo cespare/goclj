@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -106,19 +107,24 @@ func (t *Tree) unexpected(tok token) { t.errorf(tok.pos, "unexpected token %q", 
 
 func (t *Tree) unexpectedEOF(tok token) { t.errorf(tok.pos, "unexpected EOF") }
 
-func File(filename string, includeNonSemantic bool) (*Tree, error) {
-	f, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
+func Reader(r io.Reader, filename string, includeNonSemantic bool) (*Tree, error) {
 	t := &Tree{
 		includeNonSemantic: includeNonSemantic,
-		lex:                lex(filename, bufio.NewReader(f)),
+		lex:                lex(filename, bufio.NewReader(r)),
 	}
 	if err := t.Parse(); err != nil {
 		return nil, err
 	}
 	return t, nil
+}
+
+func File(filename string, includeNonSemantic bool) (*Tree, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return Reader(f, filename, includeNonSemantic)
 }
 
 // parse parses the next top-level item from the token stream. It returns nil if there are no non-EOF tokens
