@@ -120,29 +120,28 @@ func (p *Printer) PrintNode(node parse.Node, indent int) {
 }
 
 func (p *Printer) PrintSequence(nodes []parse.Node, indent int, listIndent bool) {
-	newline := false
+	prevNewline := false
 	subIndent := indent
 	for i, n := range nodes {
 		if _, ok := n.(*parse.NewlineNode); ok {
-			p.WriteByte('\n')
 			if listIndent && i == 1 {
 				indent++
 			}
 			subIndent = indent
-			newline = true
+			p.WriteByte('\n')
+			p.WriteString(strings.Repeat(string(p.IndentChar), indent))
+			prevNewline = true
 			continue
 		}
 		if listIndent && i == 1 {
 			indent += ListIndentWidth(nodes[0])
 		}
-		if newline {
-			p.WriteString(strings.Repeat(string(p.IndentChar), indent))
-			newline = false
-		} else if i > 0 {
+		if !prevNewline && i > 0 {
 			p.WriteByte(' ')
 		}
 		p.PrintNode(n, subIndent)
 		subIndent += IndentWidth(n)
+		prevNewline = false
 	}
 }
 
