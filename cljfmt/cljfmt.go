@@ -309,11 +309,11 @@ func writeFormatted(filename string, indentChar byte, listDifferent, writeFile b
 		return err
 	}
 	tw.Close()
-	identical, err := diff.Files(filename, tw.Name())
+	different, err := diff.Files(filename, tw.Name())
 	if err != nil {
 		return err
 	}
-	if identical {
+	if !different {
 		return nil
 	}
 	if listDifferent {
