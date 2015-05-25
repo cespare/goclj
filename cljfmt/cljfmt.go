@@ -206,13 +206,13 @@ func IndentWidth(node parse.Node) int {
 }
 
 var indentSpecial = regexp.MustCompile(
-	`^(def.*|let.*|send.*|when.*|with.*)$`,
+	`^(def.*|if.*|let.*|send.*|when.*|with.*)$`,
 )
 
 func ListIndentWidth(node parse.Node) int {
 	if node, ok := node.(*parse.SymbolNode); ok {
 		switch node.Val {
-		case "catch", "doto", "if", "loop", "ns":
+		case "binding", "catch", "doseq", "doto", "fn", "for", "loop", "ns", "update":
 			return 1
 		}
 		if indentSpecial.MatchString(node.Val) {
