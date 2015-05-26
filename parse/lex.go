@@ -386,25 +386,37 @@ func lexKeyword(l *lexer) stateFn {
 }
 
 func lexDispatch(l *lexer) stateFn {
-	// Dispatch is tricky. '#foo" and '# foo' are both interpeted as the tag 'foo'. However, '# _' is not
-	// interpreted as the ignore macro -- it is the tag '_'. (So the whitespace matters when tokenizing a
-	// dispatch macro.) We'll work around this by cheating slightly: if it's a tag, we'll emit an octothorpe
-	// token and move on (the subsequent symbol is the tag value). If it's another use of #, the dispatch token
-	// we emit will have two chars. The second char will be repeated in the following token. (for instance,
-	// "#{1}" will be tokenized as "#{", "{", "1", "}".
+	// Dispatch is tricky. '#foo" and '# foo' are both interpeted as the tag 'foo'.
+	// However, '# _' is not interpreted as the ignore macro -- it is the tag '_'.
+	// (So the whitespace matters when tokenizing a dispatch macro.)
+	// Here's how we navigate this:
+	//
+	// If it's a tag, we'll emit an octothorpe token and move on (the subsequent symbol is the tag value).
+	//
+	// If it's a paired delimiter dispatch form -- #{...}, #(...), or #"..." -- the dispatch token we emit
+	// will have two chars. The second char will be repeated in the following token.
+	// (for instance, "#{1}" will be tokenized as "#{", "{", "1", "}".
+	//
+	// Otherwise, the dispatch token is two chars and the following token is distinct.
 	r, eof := l.next()
 	if eof {
 		l.emit(tokOctothorpe)
 		return nil
 	}
 	val := string(l.val)
-	l.back()
-	l.skip()
 	switch r {
-	case '{', '(', '\'', '"', '_':
+	case '{', '(', '"':
+		l.back()
+		l.skip()
+		l.synth(tokDispatch, val)
+		return lexOuter
+	case '\'', '_':
+		l.skip()
 		l.synth(tokDispatch, val)
 		return lexOuter
 	default:
+		l.back()
+		l.skip()
 		l.emit(tokOctothorpe)
 	}
 	return lexOuter

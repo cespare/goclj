@@ -346,10 +346,6 @@ func (t *Tree) parseFnLiteral(start token) Node {
 
 func (t *Tree) parseIgnoreForm(start token) Node {
 	tok := t.next()
-	if tok.typ != tokSymbol || tok.val != "_" {
-		panic("should not happen")
-	}
-	tok = t.next()
 	if tok.typ == tokEOF {
 		t.unexpectedEOF(tok)
 	}
@@ -387,11 +383,7 @@ func (t *Tree) parseSet(start token) Node {
 }
 
 func (t *Tree) parseVarQuote(start token) Node {
-	tok := t.next()
-	if tok.typ != tokApostrophe {
-		panic("should not happen")
-	}
-	switch tok = t.next(); tok.typ {
+	switch tok := t.next(); tok.typ {
 	case tokSymbol:
 		return &VarQuoteNode{start.pos, tok.val}
 	case tokEOF:

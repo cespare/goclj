@@ -32,6 +32,9 @@ var testCases = []struct {
 	{"~@foo", "unquote splice"},
 	{"#'asdf", "varquote(asdf)"},
 	{"[a b c]", "vector(length=3)"},
+
+	// issue #13
+	{"#_foobar", "ignore"},
 }
 
 func TestAll(t *testing.T) {
