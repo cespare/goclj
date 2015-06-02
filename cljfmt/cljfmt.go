@@ -62,7 +62,7 @@ func (p *Printer) PrintNode(node parse.Node, w int) int {
 		return p.PrintNode(node.Node, w)
 	case *parse.FnLiteralNode:
 		w += p.WriteString("#(")
-		w = p.PrintSequence(node.Nodes, w, true)
+		w = p.PrintSequence(node.Nodes, w, useListIndent(node.Nodes))
 		return w + p.WriteString(")")
 	case *parse.IgnoreFormNode:
 		w += p.WriteString("#_")
@@ -71,7 +71,7 @@ func (p *Printer) PrintNode(node parse.Node, w int) int {
 		return w + p.WriteString(node.Val)
 	case *parse.ListNode:
 		w += p.WriteString("(")
-		w = p.PrintSequence(node.Nodes, w, true)
+		w = p.PrintSequence(node.Nodes, w, useListIndent(node.Nodes))
 		return w + p.WriteString(")")
 	case *parse.MapNode:
 		w += p.WriteString("{")
@@ -120,6 +120,17 @@ func (p *Printer) PrintNode(node parse.Node, w int) int {
 		FmtErrf("%s: unhandled node type %T", node.Position(), node)
 	}
 	return 0
+}
+
+func useListIndent(nodes []parse.Node) bool {
+	if len(nodes) == 0 {
+		return false
+	}
+	switch nodes[0].(type) {
+	case *parse.SymbolNode, *parse.KeywordNode:
+		return true
+	}
+	return false
 }
 
 func (p *Printer) PrintSequence(nodes []parse.Node, w int, listIndent bool) int {
