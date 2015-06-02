@@ -152,17 +152,18 @@ func (p *Printer) applySpecialIndentRules(node *parse.ListNode) {
 }
 
 func (p *Printer) applySpecialLetfn(nodes []parse.Node) {
-	if len(nodes) < 2 {
-		return
-	}
-	node := nodes[1]
-	v, ok := node.(*parse.VectorNode)
-	if !ok {
-		return
-	}
-	for _, n := range v.Nodes {
-		if fn, ok := n.(*parse.ListNode); ok {
-			p.specialIndent[fn] = struct{}{}
+	for _, node := range nodes[1:] {
+		if isNewline(node) {
+			continue
+		}
+		v, ok := node.(*parse.VectorNode)
+		if !ok {
+			return
+		}
+		for _, n := range v.Nodes {
+			if fn, ok := n.(*parse.ListNode); ok {
+				p.specialIndent[fn] = struct{}{}
+			}
 		}
 	}
 }
@@ -191,16 +192,34 @@ func chooseIndent(nodes []parse.Node) IndentStyle {
 	return IndentNormal
 }
 
-var indentSpecial = regexp.MustCompile(
-	`^(def.*|if.*|let.*|send.*|when.*|with.*)$`,
+var indentSpecialRegex = regexp.MustCompile(
+	`^(def.*|let.*|send.*|with.*)$`,
 )
 
+var indentSpecial = make(map[string]struct{})
+
+func init() {
+	for _, word := range []string{
+		"as->", "binding", "bound-fn", "case", "catch", "cond->", "cond->>",
+		"condp", "def", "definline", "definterface", "defmacro", "defmethod",
+		"defmulti", "defn", "defn-", "defonce", "defprotocol", "defrecord",
+		"defstruct", "deftest", "deftest-", "deftype", "doseq", "dotimes", "doto",
+		"extend", "extend-protocol", "extend-type", "fn", "for", "if", "if-let",
+		"if-not", "if-some", "let", "letfn", "locking", "loop", "ns", "proxy",
+		"reify", "set-test", "testing", "when", "when-first", "when-let",
+		"when-not", "when-some", "while", "with-bindings", "with-in-str",
+		"with-local-vars", "with-open", "with-precision", "with-redefs",
+		"with-redefs-fn", "with-test",
+	} {
+		indentSpecial[word] = struct{}{}
+	}
+}
+
 func special(node *parse.SymbolNode) bool {
-	switch node.Val {
-	case "binding", "catch", "doseq", "doto", "fn", "for", "loop", "ns", "update":
+	if _, ok := indentSpecial[node.Val]; ok {
 		return true
 	}
-	return indentSpecial.MatchString(node.Val)
+	return indentSpecialRegex.MatchString(node.Val)
 }
 
 type IndentStyle int
@@ -219,7 +238,7 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, indentStyle IndentSty
 		firstIndent int // used for IndentList, for tracking indent based on nodes[0]
 	)
 	for i, n := range nodes {
-		if _, ok := n.(*parse.NewlineNode); ok {
+		if isNewline(n) {
 			if indentStyle != IndentNormal && i == 1 {
 				w++
 			}
@@ -256,6 +275,11 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, indentStyle IndentSty
 		p.WriteString(strings.Repeat(string(p.IndentChar), w))
 	}
 	return w2
+}
+
+func isNewline(node parse.Node) bool {
+	_, ok := node.(*parse.NewlineNode)
+	return ok
 }
 
 type bufWriter struct {

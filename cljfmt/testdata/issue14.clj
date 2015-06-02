@@ -1,4 +1,6 @@
 (defn foo
   ([a] 1)
   ([a b]
-   c))
+   (if foo
+     bar
+     baz)))
