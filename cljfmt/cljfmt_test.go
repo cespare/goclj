@@ -16,7 +16,9 @@ func TestIssue8(t *testing.T)     { testFixture(t, "testdata/issue8.clj") }
 func TestIssue9(t *testing.T)     { testFixture(t, "testdata/issue9.clj") }
 func TestIssue10(t *testing.T)    { testFixture(t, "testdata/issue10.clj") }
 func TestIssue14(t *testing.T)    { testFixture(t, "testdata/issue14.clj") }
+func TestIssue15(t *testing.T)    { testFixture(t, "testdata/issue15.clj") }
 func TestIssue16(t *testing.T)    { testFixture(t, "testdata/issue16.clj") }
+func TestIssue17(t *testing.T)    { testFixture(t, "testdata/issue17.clj") }
 func TestIssue18(t *testing.T)    { testFixture(t, "testdata/issue18.clj") }
 
 func testFixture(t *testing.T, filename string) {

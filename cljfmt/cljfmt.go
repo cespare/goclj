@@ -17,12 +17,15 @@ import (
 type Printer struct {
 	*bufWriter
 	IndentChar byte
+
+	specialIndent map[*parse.ListNode]struct{}
 }
 
 func NewPrinter(w io.Writer) *Printer {
 	return &Printer{
-		bufWriter:  &bufWriter{bufio.NewWriter(w)},
-		IndentChar: ' ',
+		bufWriter:     &bufWriter{bufio.NewWriter(w)},
+		IndentChar:    ' ',
+		specialIndent: make(map[*parse.ListNode]struct{}),
 	}
 }
 
@@ -39,7 +42,7 @@ func (p *Printer) PrintTree(t *parse.Tree) (err error) {
 			}
 		}
 	}()
-	p.PrintSequence(t.Roots, 0, false)
+	p.PrintSequence(t.Roots, 0, IndentNormal)
 	return p.bw.Flush()
 }
 
@@ -62,7 +65,7 @@ func (p *Printer) PrintNode(node parse.Node, w int) int {
 		return p.PrintNode(node.Node, w)
 	case *parse.FnLiteralNode:
 		w += p.WriteString("#(")
-		w = p.PrintSequence(node.Nodes, w, useListIndent(node.Nodes))
+		w = p.PrintSequence(node.Nodes, w, chooseIndent(node.Nodes))
 		return w + p.WriteString(")")
 	case *parse.IgnoreFormNode:
 		w += p.WriteString("#_")
@@ -70,12 +73,20 @@ func (p *Printer) PrintNode(node parse.Node, w int) int {
 	case *parse.KeywordNode:
 		return w + p.WriteString(node.Val)
 	case *parse.ListNode:
+		p.applySpecialIndentRules(node)
+		var style IndentStyle
+		if _, ok := p.specialIndent[node]; ok {
+			style = IndentListSpecial
+			delete(p.specialIndent, node)
+		} else {
+			style = chooseIndent(node.Nodes)
+		}
 		w += p.WriteString("(")
-		w = p.PrintSequence(node.Nodes, w, useListIndent(node.Nodes))
+		w = p.PrintSequence(node.Nodes, w, style)
 		return w + p.WriteString(")")
 	case *parse.MapNode:
 		w += p.WriteString("{")
-		w = p.PrintSequence(node.Nodes, w, false)
+		w = p.PrintSequence(node.Nodes, w, IndentNormal)
 		return w + p.WriteString("}")
 	case *parse.MetadataNode:
 		w += p.WriteByte('^')
@@ -93,7 +104,7 @@ func (p *Printer) PrintNode(node parse.Node, w int) int {
 		return w + p.WriteString(`#"`+node.Val+`"`)
 	case *parse.SetNode:
 		w += p.WriteString("#{")
-		w = p.PrintSequence(node.Nodes, w, false)
+		w = p.PrintSequence(node.Nodes, w, IndentNormal)
 		return w + p.WriteString("}")
 	case *parse.StringNode:
 		return w + p.WriteString(`"`+node.Val+`"`)
@@ -114,7 +125,7 @@ func (p *Printer) PrintNode(node parse.Node, w int) int {
 		return w + p.WriteString("#'"+node.Val)
 	case *parse.VectorNode:
 		w += p.WriteString("[")
-		w = p.PrintSequence(node.Nodes, w, false)
+		w = p.PrintSequence(node.Nodes, w, IndentNormal)
 		return w + p.WriteString("]")
 	default:
 		FmtErrf("%s: unhandled node type %T", node.Position(), node)
@@ -122,27 +133,94 @@ func (p *Printer) PrintNode(node parse.Node, w int) int {
 	return 0
 }
 
-func useListIndent(nodes []parse.Node) bool {
-	if len(nodes) == 0 {
-		return false
+// TODO: Create a simple rules interface or something to easily specify the special rules below.
+
+func (p *Printer) applySpecialIndentRules(node *parse.ListNode) {
+	if len(node.Nodes) == 0 {
+		return
 	}
-	switch nodes[0].(type) {
-	case *parse.SymbolNode, *parse.KeywordNode:
-		return true
+	s, ok := node.Nodes[0].(*parse.SymbolNode)
+	if !ok {
+		return
 	}
-	return false
+	switch s.Val {
+	case "letfn":
+		p.applySpecialLetfn(node.Nodes)
+	case "deftype":
+		p.applySpecialDeftype(node.Nodes)
+	}
 }
 
-func (p *Printer) PrintSequence(nodes []parse.Node, w int, listIndent bool) int {
+func (p *Printer) applySpecialLetfn(nodes []parse.Node) {
+	if len(nodes) < 2 {
+		return
+	}
+	node := nodes[1]
+	v, ok := node.(*parse.VectorNode)
+	if !ok {
+		return
+	}
+	for _, n := range v.Nodes {
+		if fn, ok := n.(*parse.ListNode); ok {
+			p.specialIndent[fn] = struct{}{}
+		}
+	}
+}
+
+func (p *Printer) applySpecialDeftype(nodes []parse.Node) {
+	for _, node := range nodes[1:] {
+		if fn, ok := node.(*parse.ListNode); ok {
+			p.specialIndent[fn] = struct{}{}
+		}
+	}
+}
+
+func chooseIndent(nodes []parse.Node) IndentStyle {
+	if len(nodes) == 0 {
+		return IndentNormal
+	}
+	switch node := nodes[0].(type) {
+	case *parse.KeywordNode:
+		return IndentList
+	case *parse.SymbolNode:
+		if special(node) {
+			return IndentListSpecial
+		}
+		return IndentList
+	}
+	return IndentNormal
+}
+
+var indentSpecial = regexp.MustCompile(
+	`^(def.*|if.*|let.*|send.*|when.*|with.*)$`,
+)
+
+func special(node *parse.SymbolNode) bool {
+	switch node.Val {
+	case "binding", "catch", "doseq", "doto", "fn", "for", "loop", "ns", "update":
+		return true
+	}
+	return indentSpecial.MatchString(node.Val)
+}
+
+type IndentStyle int
+
+const (
+	IndentNormal      IndentStyle = iota // [1\n2] ; 2 is below 1
+	IndentList                           // (foo bar\nbaz) ; baz is below bar
+	IndentListSpecial                    // (defn foo []\nbar) ; bar is indented 2
+)
+
+func (p *Printer) PrintSequence(nodes []parse.Node, w int, indentStyle IndentStyle) int {
 	var (
 		w2          = w
 		needSpace   = false
 		needIndent  = false
-		firstIndent int // used if listIndent == true, for tracking indent based on nodes[0]
+		firstIndent int // used for IndentList, for tracking indent based on nodes[0]
 	)
 	for i, n := range nodes {
 		if _, ok := n.(*parse.NewlineNode); ok {
-			if listIndent && i == 1 {
+			if indentStyle != IndentNormal && i == 1 {
 				w++
 			}
 			w2 = w
@@ -151,11 +229,12 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, listIndent bool) int 
 			needSpace = false
 			continue
 		}
-		if listIndent && i == 1 {
-			if special(nodes[0]) {
-				w++
-			} else {
+		if i == 1 {
+			switch indentStyle {
+			case IndentList:
 				w = firstIndent + 1
+			case IndentListSpecial:
+				w++
 			}
 		}
 		if needIndent {
@@ -177,23 +256,6 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, listIndent bool) int 
 		p.WriteString(strings.Repeat(string(p.IndentChar), w))
 	}
 	return w2
-}
-
-var indentSpecial = regexp.MustCompile(
-	`^(def.*|if.*|let.*|send.*|when.*|with.*)$`,
-)
-
-func special(node parse.Node) bool {
-	if node, ok := node.(*parse.SymbolNode); ok {
-		switch node.Val {
-		case "binding", "catch", "doseq", "doto", "fn", "for", "loop", "ns", "update":
-			return true
-		}
-		if indentSpecial.MatchString(node.Val) {
-			return true
-		}
-	}
-	return false
 }
 
 type bufWriter struct {
