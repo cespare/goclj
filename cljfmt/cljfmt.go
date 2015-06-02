@@ -137,6 +137,7 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, listIndent bool) int 
 	var (
 		w2          = w
 		needSpace   = false
+		needIndent  = false
 		firstIndent int // used if listIndent == true, for tracking indent based on nodes[0]
 	)
 	for i, n := range nodes {
@@ -146,7 +147,7 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, listIndent bool) int 
 			}
 			w2 = w
 			p.WriteByte('\n')
-			p.WriteString(strings.Repeat(string(p.IndentChar), w))
+			needIndent = true
 			needSpace = false
 			continue
 		}
@@ -157,6 +158,9 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, listIndent bool) int 
 				w = firstIndent + 1
 			}
 		}
+		if needIndent {
+			p.WriteString(strings.Repeat(string(p.IndentChar), w))
+		}
 		if needSpace {
 			w2 += p.WriteByte(' ')
 		}
@@ -164,7 +168,13 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, listIndent bool) int 
 		if i == 0 {
 			firstIndent = w2
 		}
+		needIndent = false
 		needSpace = true
+	}
+	// We need to put in a trailing indent here; the next token cannot be a newline
+	// (it will need to be the closing delimiter for this sequence).
+	if needIndent {
+		p.WriteString(strings.Repeat(string(p.IndentChar), w))
 	}
 	return w2
 }
