@@ -43,183 +43,136 @@ func (p *Printer) PrintTree(t *parse.Tree) (err error) {
 	return p.bw.Flush()
 }
 
-func (p *Printer) PrintNode(node parse.Node, indent int) {
+// PrintNode prints a representation of node using w, the given indent level, as a baseline.
+// It returns the new indent.
+func (p *Printer) PrintNode(node parse.Node, w int) int {
 	switch node := node.(type) {
 	case *parse.BoolNode:
 		if node.Val {
-			p.WriteString("true")
+			return w + p.WriteString("true")
 		} else {
-			p.WriteString("false")
+			return w + p.WriteString("false")
 		}
 	case *parse.CharacterNode:
-		p.WriteString(node.Text)
+		return w + p.WriteString(node.Text)
 	case *parse.CommentNode:
-		p.WriteString(node.Text)
+		return w + p.WriteString(node.Text)
 	case *parse.DerefNode:
-		p.WriteByte('@')
-		p.PrintNode(node.Node, indent+1)
+		w += p.WriteByte('@')
+		return p.PrintNode(node.Node, w)
 	case *parse.FnLiteralNode:
-		p.WriteString("#(")
-		p.PrintSequence(node.Nodes, indent+2, true)
-		p.WriteString(")")
+		w += p.WriteString("#(")
+		w = p.PrintSequence(node.Nodes, w, true)
+		return w + p.WriteString(")")
 	case *parse.IgnoreFormNode:
-		p.WriteString("#_")
-		p.PrintNode(node.Node, indent+2)
+		w += p.WriteString("#_")
+		return p.PrintNode(node.Node, w)
 	case *parse.KeywordNode:
-		p.WriteString(node.Val)
+		return w + p.WriteString(node.Val)
 	case *parse.ListNode:
-		p.WriteString("(")
-		p.PrintSequence(node.Nodes, indent+1, true)
-		p.WriteString(")")
+		w += p.WriteString("(")
+		w = p.PrintSequence(node.Nodes, w, true)
+		return w + p.WriteString(")")
 	case *parse.MapNode:
-		p.WriteString("{")
-		p.PrintSequence(node.Nodes, indent+1, false)
-		p.WriteString("}")
+		w += p.WriteString("{")
+		w = p.PrintSequence(node.Nodes, w, false)
+		return w + p.WriteString("}")
 	case *parse.MetadataNode:
-		p.WriteByte('^')
-		p.PrintNode(node.Node, indent+1)
+		w += p.WriteByte('^')
+		return p.PrintNode(node.Node, w)
 	case *parse.NewlineNode:
 		panic("should not happen")
 	case *parse.NilNode:
-		p.WriteString("nil")
+		return w + p.WriteString("nil")
 	case *parse.NumberNode:
-		p.WriteString(node.Val)
+		return w + p.WriteString(node.Val)
 	case *parse.QuoteNode:
-		p.WriteByte('\'')
-		p.PrintNode(node.Node, indent+1)
+		w += p.WriteByte('\'')
+		return p.PrintNode(node.Node, w)
 	case *parse.RegexNode:
-		p.WriteString(`#"` + node.Val + `"`)
+		return w + p.WriteString(`#"`+node.Val+`"`)
 	case *parse.SetNode:
-		p.WriteString("#{")
-		p.PrintSequence(node.Nodes, indent+2, false)
-		p.WriteString("}")
+		w += p.WriteString("#{")
+		w = p.PrintSequence(node.Nodes, w, false)
+		return w + p.WriteString("}")
 	case *parse.StringNode:
-		p.WriteString(`"` + node.Val + `"`)
+		return w + p.WriteString(`"`+node.Val+`"`)
 	case *parse.SymbolNode:
-		p.WriteString(node.Val)
+		return w + p.WriteString(node.Val)
 	case *parse.SyntaxQuoteNode:
-		p.WriteByte('`')
-		p.PrintNode(node.Node, indent+1)
+		w += p.WriteByte('`')
+		return p.PrintNode(node.Node, w)
 	case *parse.TagNode:
-		p.WriteString("#" + node.Val)
+		return w + p.WriteString("#"+node.Val)
 	case *parse.UnquoteNode:
-		p.WriteByte('~')
-		p.PrintNode(node.Node, indent+1)
+		w += p.WriteByte('~')
+		return p.PrintNode(node.Node, w)
 	case *parse.UnquoteSpliceNode:
-		p.WriteString("~@")
-		p.PrintNode(node.Node, indent+2)
+		w += p.WriteString("~@")
+		return p.PrintNode(node.Node, w)
 	case *parse.VarQuoteNode:
-		p.WriteString("#'" + node.Val)
+		return w + p.WriteString("#'"+node.Val)
 	case *parse.VectorNode:
-		p.WriteString("[")
-		p.PrintSequence(node.Nodes, indent+1, false)
-		p.WriteString("]")
+		w += p.WriteString("[")
+		w = p.PrintSequence(node.Nodes, w, false)
+		return w + p.WriteString("]")
 	default:
 		FmtErrf("%s: unhandled node type %T", node.Position(), node)
 	}
+	return 0
 }
 
-func (p *Printer) PrintSequence(nodes []parse.Node, indent int, listIndent bool) {
-	prevNewline := false
-	subIndent := indent
+func (p *Printer) PrintSequence(nodes []parse.Node, w int, listIndent bool) int {
+	var (
+		w2          = w
+		needSpace   = false
+		firstIndent int // used if listIndent == true, for tracking indent based on nodes[0]
+	)
 	for i, n := range nodes {
 		if _, ok := n.(*parse.NewlineNode); ok {
 			if listIndent && i == 1 {
-				indent++
+				w++
 			}
-			subIndent = indent
+			w2 = w
 			p.WriteByte('\n')
-			p.WriteString(strings.Repeat(string(p.IndentChar), indent))
-			prevNewline = true
+			p.WriteString(strings.Repeat(string(p.IndentChar), w))
+			needSpace = false
 			continue
 		}
 		if listIndent && i == 1 {
-			indent += ListIndentWidth(nodes[0])
+			if special(nodes[0]) {
+				w++
+			} else {
+				w = firstIndent + 1
+			}
 		}
-		if !prevNewline && i > 0 {
-			p.WriteByte(' ')
+		if needSpace {
+			w2 += p.WriteByte(' ')
 		}
-		p.PrintNode(n, subIndent)
-		subIndent += IndentWidth(n)
-		prevNewline = false
+		w2 = p.PrintNode(n, w2)
+		if i == 0 {
+			firstIndent = w2
+		}
+		needSpace = true
 	}
-}
-
-// IndentWidth is the width of a form for the purposes of indenting the next line.
-// For 'simple' forms (symbols, keywords, ...) the width includes one extra
-// at the end for the following space.
-func IndentWidth(node parse.Node) int {
-	switch node := node.(type) {
-	case *parse.BoolNode:
-		if node.Val {
-			return 5
-		}
-		return 6
-	case *parse.CharacterNode:
-		return 2 // Not going to worry about multiwidth chars
-	case *parse.CommentNode:
-		return 0
-	case *parse.DerefNode:
-		return 1 + IndentWidth(node.Node)
-	case *parse.KeywordNode:
-		return len(node.Val) + 1
-	case *parse.ListNode:
-		return 2
-	case *parse.MapNode:
-		return 2
-	case *parse.MetadataNode:
-		return 1 + IndentWidth(node.Node)
-	case *parse.NewlineNode:
-		return 0
-	case *parse.NilNode:
-		return 4
-	case *parse.NumberNode:
-		return len(node.Val) + 1
-	case *parse.SymbolNode:
-		return len(node.Val) + 1
-	case *parse.QuoteNode:
-		return 1 + IndentWidth(node.Node)
-	case *parse.StringNode:
-		return 3 + len(node.Val)
-	case *parse.SyntaxQuoteNode:
-		return 1 + IndentWidth(node.Node)
-	case *parse.UnquoteNode:
-		return 1 + IndentWidth(node.Node)
-	case *parse.UnquoteSpliceNode:
-		return 1 + IndentWidth(node.Node)
-	case *parse.VectorNode:
-		return 2
-	case *parse.FnLiteralNode:
-		return 2
-	case *parse.IgnoreFormNode:
-		return 2 + IndentWidth(node.Node)
-	case *parse.RegexNode:
-		return 4 + len(node.Val)
-	case *parse.SetNode:
-		return 2
-	case *parse.VarQuoteNode:
-		return 1 + len(node.Val)
-	case *parse.TagNode:
-		return 1 + len(node.Val)
-	}
-	panic("unreached")
+	return w2
 }
 
 var indentSpecial = regexp.MustCompile(
 	`^(def.*|if.*|let.*|send.*|when.*|with.*)$`,
 )
 
-func ListIndentWidth(node parse.Node) int {
+func special(node parse.Node) bool {
 	if node, ok := node.(*parse.SymbolNode); ok {
 		switch node.Val {
 		case "binding", "catch", "doseq", "doto", "fn", "for", "loop", "ns", "update":
-			return 1
+			return true
 		}
 		if indentSpecial.MatchString(node.Val) {
-			return 1
+			return true
 		}
 	}
-	return IndentWidth(node)
+	return false
 }
 
 type bufWriter struct {
