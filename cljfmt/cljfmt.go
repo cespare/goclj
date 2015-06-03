@@ -253,11 +253,16 @@ const (
 
 func (p *Printer) PrintSequence(nodes []parse.Node, w int, indentStyle IndentStyle) int {
 	var (
-		w2          = w
-		needSpace   = false
-		needIndent  = false
-		firstIndent int // used for IndentList, for tracking indent based on nodes[0]
-		idxSemantic int // used for IndentLet, for counting semantic tokens
+		w2         = w
+		needSpace  = false
+		needIndent = false
+
+		// used for IndentList, for tracking indent based on nodes[0]
+		firstIndent int
+
+		// used for IndentLet, for counting semantic tokens
+		idxSemantic int
+		letIndent   = false
 	)
 	for i, n := range nodes {
 		if isNewline(n) {
@@ -269,6 +274,7 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, indentStyle IndentSty
 			case IndentLet:
 				if idxSemantic%2 == 1 {
 					w += 2
+					letIndent = true
 				}
 			}
 			w2 = w
@@ -302,6 +308,10 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, indentStyle IndentSty
 		}
 		needIndent = false
 		needSpace = true
+		if letIndent {
+			w -= 2
+			letIndent = false
+		}
 	}
 	// We need to put in a trailing indent here; the next token cannot be a newline
 	// (it will need to be the closing delimiter for this sequence).

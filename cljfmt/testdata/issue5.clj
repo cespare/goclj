@@ -1,6 +1,7 @@
 (let [foo 123
       bar
-        (baz asdf)]
+        (baz asdf)
+      quux 234]
   nil)
 
 (let [foo ; bar
