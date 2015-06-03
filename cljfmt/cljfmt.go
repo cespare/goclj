@@ -18,14 +18,14 @@ type Printer struct {
 	*bufWriter
 	IndentChar byte
 
-	specialIndent map[*parse.ListNode]struct{}
+	specialIndent map[parse.Node]IndentStyle
 }
 
 func NewPrinter(w io.Writer) *Printer {
 	return &Printer{
 		bufWriter:     &bufWriter{bufio.NewWriter(w)},
 		IndentChar:    ' ',
-		specialIndent: make(map[*parse.ListNode]struct{}),
+		specialIndent: make(map[parse.Node]IndentStyle),
 	}
 }
 
@@ -75,8 +75,8 @@ func (p *Printer) PrintNode(node parse.Node, w int) int {
 	case *parse.ListNode:
 		p.applySpecialIndentRules(node)
 		var style IndentStyle
-		if _, ok := p.specialIndent[node]; ok {
-			style = IndentListSpecial
+		var ok bool
+		if style, ok = p.specialIndent[node]; ok {
 			delete(p.specialIndent, node)
 		} else {
 			style = chooseIndent(node.Nodes)
@@ -124,8 +124,14 @@ func (p *Printer) PrintNode(node parse.Node, w int) int {
 	case *parse.VarQuoteNode:
 		return w + p.WriteString("#'"+node.Val)
 	case *parse.VectorNode:
+		style, ok := p.specialIndent[node]
+		if ok {
+			delete(p.specialIndent, node)
+		} else {
+			style = IndentNormal
+		}
 		w += p.WriteString("[")
-		w = p.PrintSequence(node.Nodes, w, IndentNormal)
+		w = p.PrintSequence(node.Nodes, w, style)
 		return w + p.WriteString("]")
 	default:
 		FmtErrf("%s: unhandled node type %T", node.Position(), node)
@@ -144,10 +150,24 @@ func (p *Printer) applySpecialIndentRules(node *parse.ListNode) {
 		return
 	}
 	switch s.Val {
+	case "let":
+		p.applySpecialLet(node.Nodes)
 	case "letfn":
 		p.applySpecialLetfn(node.Nodes)
 	case "deftype":
 		p.applySpecialDeftype(node.Nodes)
+	}
+}
+
+func (p *Printer) applySpecialLet(nodes []parse.Node) {
+	for _, node := range nodes[1:] {
+		if isNewline(node) {
+			continue
+		}
+		if v, ok := node.(*parse.VectorNode); ok {
+			p.specialIndent[v] = IndentLet
+		}
+		return
 	}
 }
 
@@ -162,7 +182,7 @@ func (p *Printer) applySpecialLetfn(nodes []parse.Node) {
 		}
 		for _, n := range v.Nodes {
 			if fn, ok := n.(*parse.ListNode); ok {
-				p.specialIndent[fn] = struct{}{}
+				p.specialIndent[fn] = IndentListSpecial
 			}
 		}
 	}
@@ -171,7 +191,7 @@ func (p *Printer) applySpecialLetfn(nodes []parse.Node) {
 func (p *Printer) applySpecialDeftype(nodes []parse.Node) {
 	for _, node := range nodes[1:] {
 		if fn, ok := node.(*parse.ListNode); ok {
-			p.specialIndent[fn] = struct{}{}
+			p.specialIndent[fn] = IndentListSpecial
 		}
 	}
 }
@@ -228,6 +248,7 @@ const (
 	IndentNormal      IndentStyle = iota // [1\n2] ; 2 is below 1
 	IndentList                           // (foo bar\nbaz) ; baz is below bar
 	IndentListSpecial                    // (defn foo []\nbar) ; bar is indented 2
+	IndentLet                            // (let [foo\nbar]) ; bar is indented two beyond foo
 )
 
 func (p *Printer) PrintSequence(nodes []parse.Node, w int, indentStyle IndentStyle) int {
@@ -236,11 +257,19 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, indentStyle IndentSty
 		needSpace   = false
 		needIndent  = false
 		firstIndent int // used for IndentList, for tracking indent based on nodes[0]
+		idxSemantic int // used for IndentLet, for counting semantic tokens
 	)
 	for i, n := range nodes {
 		if isNewline(n) {
-			if indentStyle != IndentNormal && i == 1 {
-				w++
+			switch indentStyle {
+			case IndentList, IndentListSpecial:
+				if i == 1 {
+					w++
+				}
+			case IndentLet:
+				if idxSemantic%2 == 1 {
+					w += 2
+				}
 			}
 			w2 = w
 			p.WriteByte('\n')
@@ -248,11 +277,16 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, indentStyle IndentSty
 			needSpace = false
 			continue
 		}
-		if i == 1 {
-			switch indentStyle {
-			case IndentList:
+		if isSemantic(n) {
+			idxSemantic++
+		}
+		switch indentStyle {
+		case IndentList:
+			if i == 1 {
 				w = firstIndent + 1
-			case IndentListSpecial:
+			}
+		case IndentListSpecial:
+			if i == 1 {
 				w++
 			}
 		}
@@ -280,6 +314,14 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, indentStyle IndentSty
 func isNewline(node parse.Node) bool {
 	_, ok := node.(*parse.NewlineNode)
 	return ok
+}
+
+func isSemantic(node parse.Node) bool {
+	switch node.(type) {
+	case *parse.NewlineNode, *parse.CommentNode:
+		return false
+	}
+	return true
 }
 
 type bufWriter struct {
