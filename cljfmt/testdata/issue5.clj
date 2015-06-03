@@ -6,3 +6,7 @@
 (let [foo ; bar
         baz]
   nil)
+
+(let [^String foo
+        "asdf"]
+  nil)

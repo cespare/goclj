@@ -316,9 +316,12 @@ func isNewline(node parse.Node) bool {
 	return ok
 }
 
+// isSemantic returns whether a node changes the semantics of the code.
+// NOTE: right now this is only used for let indenting.
+// It might have to be adjusted if used for other purposes.
 func isSemantic(node parse.Node) bool {
 	switch node.(type) {
-	case *parse.NewlineNode, *parse.CommentNode:
+	case *parse.NewlineNode, *parse.CommentNode, *parse.MetadataNode:
 		return false
 	}
 	return true
