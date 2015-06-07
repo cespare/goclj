@@ -8,9 +8,11 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/cespare/diff"
+	"github.com/cespare/goclj"
 	"github.com/cespare/goclj/parse"
 )
 
@@ -42,8 +44,81 @@ func (p *Printer) PrintTree(t *parse.Tree) (err error) {
 			}
 		}
 	}()
+	ApplyTransforms(t)
 	p.PrintSequence(t.Roots, 0, IndentNormal)
 	return p.bw.Flush()
+}
+
+// ApplyTransforms performs small fixes to the tree t:
+//
+//  - Reordering imports and requires
+//
+func ApplyTransforms(t *parse.Tree) {
+	for _, root := range t.Roots {
+		if goclj.FnFormSymbol(root, "ns") {
+			for _, node := range root.Children()[1:] {
+				if goclj.FnFormKeyword(node, ":require", ":import") {
+					SortImportRequire(node.(*parse.ListNode))
+				}
+			}
+		}
+	}
+}
+
+func SortImportRequire(node *parse.ListNode) {
+	children := node.Children()
+	sorted := make([]parse.Node, 0, len(children)/2)
+	for _, child := range children[1:] {
+		if goclj.Newline(child) {
+			continue
+		}
+		sorted = append(sorted, child)
+	}
+	sort.Sort(importRequireList(sorted))
+	node.Nodes = []parse.Node{children[0]}
+	for i, n := range sorted {
+		node.Nodes = append(node.Nodes, n)
+		if i < len(sorted)-1 {
+			node.Nodes = append(node.Nodes, &parse.NewlineNode{})
+		}
+	}
+}
+
+type importRequireList []parse.Node
+
+func (l importRequireList) Len() int      { return len(l) }
+func (l importRequireList) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
+
+func (l importRequireList) Less(i, j int) bool {
+	n1, n2 := l[i], l[j]
+	if s1, ok := n1.(*parse.SymbolNode); ok {
+		if s2, ok := n2.(*parse.SymbolNode); ok {
+			return s1.Val < s2.Val
+		}
+		if _, ok := n2.(*parse.VectorNode); ok {
+			return false
+		}
+		return true
+	}
+	if v1, ok := n1.(*parse.VectorNode); ok {
+		if v2, ok := n2.(*parse.VectorNode); ok {
+			if len(v1.Nodes) == 0 {
+				return true
+			}
+			if len(v2.Nodes) == 0 {
+				return false
+			}
+			if p1, ok := v1.Nodes[0].(*parse.SymbolNode); ok {
+				if p2, ok := v2.Nodes[0].(*parse.SymbolNode); ok {
+					return p1.Val < p2.Val
+				}
+				return true
+			}
+			return false
+		}
+		return true
+	}
+	return false
 }
 
 // PrintNode prints a representation of node using w, the given indent level, as a baseline.
@@ -161,7 +236,7 @@ func (p *Printer) applySpecialIndentRules(node *parse.ListNode) {
 
 func (p *Printer) applySpecialLet(nodes []parse.Node) {
 	for _, node := range nodes[1:] {
-		if isNewline(node) {
+		if goclj.Newline(node) {
 			continue
 		}
 		if v, ok := node.(*parse.VectorNode); ok {
@@ -173,7 +248,7 @@ func (p *Printer) applySpecialLet(nodes []parse.Node) {
 
 func (p *Printer) applySpecialLetfn(nodes []parse.Node) {
 	for _, node := range nodes[1:] {
-		if isNewline(node) {
+		if goclj.Newline(node) {
 			continue
 		}
 		v, ok := node.(*parse.VectorNode)
@@ -265,7 +340,7 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, indentStyle IndentSty
 		letIndent   = false
 	)
 	for i, n := range nodes {
-		if isNewline(n) {
+		if goclj.Newline(n) {
 			switch indentStyle {
 			case IndentList, IndentListSpecial:
 				if i == 1 {
@@ -283,7 +358,7 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, indentStyle IndentSty
 			needSpace = false
 			continue
 		}
-		if isSemantic(n) {
+		if goclj.Semantic(n) {
 			idxSemantic++
 		}
 		switch indentStyle {
@@ -319,22 +394,6 @@ func (p *Printer) PrintSequence(nodes []parse.Node, w int, indentStyle IndentSty
 		p.WriteString(strings.Repeat(string(p.IndentChar), w))
 	}
 	return w2
-}
-
-func isNewline(node parse.Node) bool {
-	_, ok := node.(*parse.NewlineNode)
-	return ok
-}
-
-// isSemantic returns whether a node changes the semantics of the code.
-// NOTE: right now this is only used for let indenting.
-// It might have to be adjusted if used for other purposes.
-func isSemantic(node parse.Node) bool {
-	switch node.(type) {
-	case *parse.NewlineNode, *parse.CommentNode, *parse.MetadataNode:
-		return false
-	}
-	return true
 }
 
 type bufWriter struct {
