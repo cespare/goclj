@@ -294,6 +294,7 @@ var indentSpecialRegex = regexp.MustCompile(
 var indentSpecial = make(map[string]struct{})
 
 func init() {
+	// TODO(caleb): I wish I had written down where I got this list...
 	for _, word := range []string{
 		"as->", "binding", "bound-fn", "case", "catch", "cond->", "cond->>",
 		"condp", "def", "definline", "definterface", "defmacro", "defmethod",
