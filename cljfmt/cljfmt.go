@@ -224,7 +224,7 @@ func (p *Printer) applySpecialIndentRules(node *parse.ListNode) {
 	if !ok {
 		return
 	}
-	switch s.Val {
+	switch symbolName(s.Val) {
 	case "let":
 		p.applySpecialLet(node.Nodes)
 	case "letfn":
@@ -310,11 +310,19 @@ func init() {
 	}
 }
 
+func symbolName(sym string) string {
+	if i := strings.LastIndex(sym, "/"); i >= 0 {
+		return sym[i+1:]
+	}
+	return sym
+}
+
 func special(node *parse.SymbolNode) bool {
-	if _, ok := indentSpecial[node.Val]; ok {
+	name := symbolName(node.Val)
+	if _, ok := indentSpecial[name]; ok {
 		return true
 	}
-	return indentSpecialRegex.MatchString(node.Val)
+	return indentSpecialRegex.MatchString(name)
 }
 
 type IndentStyle int
