@@ -9,10 +9,11 @@ import (
 
 // applyTransforms performs small fixes to the tree t:
 //
-//   - reordering (sorting) imports and requires
-//   - removing trailing \n nodes (dangling close parens)
+//   - reorder (sort) imports and requires
+//   - remove trailing \n nodes (dangling close parens)
 //   - move arg vectors of defns to the same line if appropriate
 //   - move dispatch-val of a defmethod to the same line
+//   - remove >1 consecutive blank lines
 func applyTransforms(t *parse.Tree) {
 	for _, root := range t.Roots {
 		if goclj.FnFormSymbol(root, "ns") {
@@ -25,7 +26,9 @@ func applyTransforms(t *parse.Tree) {
 		if goclj.FnFormSymbol(root, "defmethod") {
 			fixDefmethodDispatchVal(root)
 		}
+		removeExtraBlankLinesRecursive(root)
 	}
+	t.Roots = removeExtraBlankLines(t.Roots)
 }
 
 func sortNS(ns parse.Node) {
@@ -123,6 +126,36 @@ func fixDefmethodDispatchVal(defmethod parse.Node) {
 		nodes[2], nodes[3] = nodes[3], nodes[2]
 	}
 	defmethod.SetChildren(nodes)
+}
+
+func removeExtraBlankLinesRecursive(n parse.Node) {
+	nodes := n.Children()
+	if len(nodes) == 0 {
+		return
+	}
+	if len(nodes) > 2 {
+		nodes = removeExtraBlankLines(nodes)
+		n.SetChildren(nodes)
+	}
+	for _, node := range nodes {
+		removeExtraBlankLinesRecursive(node)
+	}
+}
+
+func removeExtraBlankLines(nodes []parse.Node) []parse.Node {
+	newNodes := make([]parse.Node, 0, len(nodes))
+	newlines := 0
+	for _, node := range nodes {
+		if goclj.Newline(node) {
+			newlines++
+		} else {
+			newlines = 0
+		}
+		if newlines <= 2 {
+			newNodes = append(newNodes, node)
+		}
+	}
+	return newNodes
 }
 
 type importRequireList []parse.Node

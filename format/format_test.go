@@ -31,6 +31,7 @@ func TestIssue23(t *testing.T) { testFixture(t, "issue23.clj") }
 
 func TestIssue7(t *testing.T)  { testTransform(t, "issue7_before.clj", "issue7_after.clj") }
 func TestIssue25(t *testing.T) { testTransform(t, "issue25_before.clj", "issue25_after.clj") }
+func TestIssue26(t *testing.T) { testTransform(t, "issue26_before.clj", "issue26_after.clj") }
 
 func testFixture(t *testing.T, filename string) {
 	testTransform(t, filename, filename)
