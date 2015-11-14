@@ -155,7 +155,7 @@ func (p *Printer) applySpecialIndentRules(node *parse.ListNode) {
 		p.applySpecialLet(node.Nodes)
 	case "letfn":
 		p.applySpecialLetfn(node.Nodes)
-	case "deftype":
+	case "deftype", "defrecord":
 		p.applySpecialDeftype(node.Nodes)
 	}
 }
