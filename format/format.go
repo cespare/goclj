@@ -261,7 +261,7 @@ const (
 	indentLet                            // (let [foo\nbar]) ; bar is indented two beyond foo
 )
 
-func (p *Printer) printSequence(nodes []parse.Node, w int, indent indentStyle) int {
+func (p *Printer) printSequence(nodes []parse.Node, w int, style indentStyle) int {
 	var (
 		w2         = w
 		needSpace  = false
@@ -276,7 +276,7 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, indent indentStyle) i
 	)
 	for i, n := range nodes {
 		if goclj.Newline(n) {
-			switch indent {
+			switch style {
 			case indentList, indentListSpecial:
 				if i == 1 {
 					w++
@@ -296,7 +296,7 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, indent indentStyle) i
 		if goclj.Semantic(n) {
 			idxSemantic++
 		}
-		switch indent {
+		switch style {
 		case indentList:
 			if i == 1 {
 				w = firstIndent + 1
