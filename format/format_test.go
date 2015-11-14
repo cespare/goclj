@@ -13,6 +13,10 @@ import (
 
 func TestSimpleFile(t *testing.T) { testFixture(t, "simple1.clj") }
 
+func TestStyleGuide(t *testing.T) {
+	testTransform(t, "styleguide_bad.clj", "styleguide_good.clj")
+}
+
 func TestIndent(t *testing.T)  { testFixture(t, "indent.clj") }
 func TestIssue5(t *testing.T)  { testFixture(t, "issue5.clj") }
 func TestIssue8(t *testing.T)  { testFixture(t, "issue8.clj") }
