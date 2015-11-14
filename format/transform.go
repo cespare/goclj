@@ -7,21 +7,26 @@ import (
 	"github.com/cespare/goclj/parse"
 )
 
-// applyTransforms performs small fixes to the tree t.
-// So far it only reorders imports and requires.
+// applyTransforms performs small fixes to the tree t:
+//
+//   - reordering (sorting) imports and requires
+//   - removing trailing \n nodes (dangling close parens)
 func applyTransforms(t *parse.Tree) {
 	for _, root := range t.Roots {
+		// Sort imports/requires.
 		if goclj.FnFormSymbol(root, "ns") {
 			for _, node := range root.Children()[1:] {
 				if goclj.FnFormKeyword(node, ":require", ":import") {
-					SortImportRequire(node.(*parse.ListNode))
+					sortImportRequire(node.(*parse.ListNode))
 				}
 			}
 		}
+		// Remove trailing \n nodes.
+		removeTrailingNewlines(root)
 	}
 }
 
-func SortImportRequire(node *parse.ListNode) {
+func sortImportRequire(node *parse.ListNode) {
 	children := node.Children()
 	sorted := make([]parse.Node, 0, len(children)/2)
 	for _, child := range children[1:] {
@@ -37,6 +42,25 @@ func SortImportRequire(node *parse.ListNode) {
 		if i < len(sorted)-1 {
 			node.Nodes = append(node.Nodes, &parse.NewlineNode{})
 		}
+	}
+}
+
+func removeTrailingNewlines(n parse.Node) {
+	nodes := n.Children()
+	if len(nodes) == 0 {
+		return
+	}
+	switch n.(type) {
+	case *parse.ListNode, *parse.MapNode, *parse.VectorNode, *parse.FnLiteralNode, *parse.SetNode:
+		for ; len(nodes) > 0; nodes = nodes[:len(nodes)-1] {
+			if _, ok := nodes[len(nodes)-1].(*parse.NewlineNode); !ok {
+				break
+			}
+		}
+		n.SetChildren(nodes)
+	}
+	for _, node := range nodes {
+		removeTrailingNewlines(node)
 	}
 }
 

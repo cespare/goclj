@@ -17,7 +17,6 @@ func TestIndent(t *testing.T)  { testFixture(t, "indent.clj") }
 func TestIssue5(t *testing.T)  { testFixture(t, "issue5.clj") }
 func TestIssue8(t *testing.T)  { testFixture(t, "issue8.clj") }
 func TestIssue9(t *testing.T)  { testFixture(t, "issue9.clj") }
-func TestIssue10(t *testing.T) { testFixture(t, "issue10.clj") }
 func TestIssue14(t *testing.T) { testFixture(t, "issue14.clj") }
 func TestIssue15(t *testing.T) { testFixture(t, "issue15.clj") }
 func TestIssue16(t *testing.T) { testFixture(t, "issue16.clj") }
@@ -26,7 +25,8 @@ func TestIssue18(t *testing.T) { testFixture(t, "issue18.clj") }
 func TestIssue19(t *testing.T) { testFixture(t, "issue19.clj") }
 func TestIssue23(t *testing.T) { testFixture(t, "issue23.clj") }
 
-func TestIssue7(t *testing.T) { testTransform(t, "issue7_before.clj", "issue7_after.clj") }
+func TestIssue7(t *testing.T)  { testTransform(t, "issue7_before.clj", "issue7_after.clj") }
+func TestIssue25(t *testing.T) { testTransform(t, "issue25_before.clj", "issue25_after.clj") }
 
 func testFixture(t *testing.T, filename string) {
 	testTransform(t, filename, filename)
