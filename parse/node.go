@@ -115,13 +115,8 @@ func (n *MapNode) String() string {
 	semanticNodes := countSemantic(n.Nodes)
 	return fmt.Sprintf("map(length=%d)", semanticNodes/2)
 }
-func (n *MapNode) Children() []Node { return n.Nodes }
-func (n *MapNode) SetChildren(nodes []Node) {
-	if len(nodes)%2 != 0 {
-		panicf("SetChildren called on MapNode with odd (%d) nodes", len(nodes))
-	}
-	n.Nodes = nodes
-}
+func (n *MapNode) Children() []Node         { return n.Nodes }
+func (n *MapNode) SetChildren(nodes []Node) { n.Nodes = nodes }
 
 type MetadataNode struct {
 	*Pos
