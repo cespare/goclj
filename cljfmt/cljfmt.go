@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/cespare/diff"
 	"github.com/cespare/goclj/format"
@@ -50,7 +51,7 @@ func main() {
 }
 
 func writeFormatted(filename string, indentChar byte, listDifferent, writeFile bool) error {
-	tw, err := ioutil.TempFile("", "cljfmt-")
+	tw, err := ioutil.TempFile(filepath.Dir(filename), "cljfmt-")
 	if err != nil {
 		return err
 	}
