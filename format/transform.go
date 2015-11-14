@@ -11,18 +11,28 @@ import (
 //
 //   - reordering (sorting) imports and requires
 //   - removing trailing \n nodes (dangling close parens)
+//   - move arg vectors of defns to the same line if appropriate
+//   - move dispatch-val of a defmethod to the same line
 func applyTransforms(t *parse.Tree) {
 	for _, root := range t.Roots {
-		// Sort imports/requires.
 		if goclj.FnFormSymbol(root, "ns") {
-			for _, node := range root.Children()[1:] {
-				if goclj.FnFormKeyword(node, ":require", ":import") {
-					sortImportRequire(node.(*parse.ListNode))
-				}
-			}
+			sortNS(root)
 		}
-		// Remove trailing \n nodes.
 		removeTrailingNewlines(root)
+		if goclj.FnFormSymbol(root, "defn") {
+			fixDefnArglist(root)
+		}
+		if goclj.FnFormSymbol(root, "defmethod") {
+			fixDefmethodDispatchVal(root)
+		}
+	}
+}
+
+func sortNS(ns parse.Node) {
+	for _, n := range ns.Children()[1:] {
+		if goclj.FnFormKeyword(n, ":require", ":import") {
+			sortImportRequire(n.(*parse.ListNode))
+		}
 	}
 }
 
@@ -62,6 +72,57 @@ func removeTrailingNewlines(n parse.Node) {
 	for _, node := range nodes {
 		removeTrailingNewlines(node)
 	}
+}
+
+func fixDefnArglist(defn parse.Node) {
+	// For defns, change
+	//   (defn foo
+	//     [x] ...)
+	// to
+	//   (defn foo [x]
+	//     ...)
+	// if there's no newline after the arg list.
+	nodes := defn.Children()
+	if len(nodes) < 5 {
+		return
+	}
+	if !goclj.Newline(nodes[2]) || goclj.Newline(nodes[4]) {
+		return
+	}
+	if _, ok := nodes[3].(*parse.VectorNode); !ok {
+		return
+	}
+	// Move the newline to be after the arglist.
+	nodes[2], nodes[3] = nodes[3], nodes[2]
+	defn.SetChildren(nodes)
+}
+
+func fixDefmethodDispatchVal(defmethod parse.Node) {
+	// For defmethods, change
+	//   (defmethod foo
+	//     :bar
+	//     [x] ...)
+	// to
+	//   (defmethod foo :bar
+	//     [x] ...)
+	nodes := defmethod.Children()
+	if len(nodes) < 5 {
+		return
+	}
+	if !goclj.Newline(nodes[2]) {
+		return
+	}
+	if _, ok := nodes[3].(*parse.KeywordNode); !ok {
+		return
+	}
+	// Move the dispatch-val up to the same line.
+	// Insert a newline after if there wasn't one already.
+	if goclj.Newline(nodes[4]) {
+		nodes = append(nodes[:2], nodes[3:]...)
+	} else {
+		nodes[2], nodes[3] = nodes[3], nodes[2]
+	}
+	defmethod.SetChildren(nodes)
 }
 
 type importRequireList []parse.Node

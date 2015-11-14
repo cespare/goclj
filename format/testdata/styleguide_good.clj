@@ -10,7 +10,7 @@
 (filter even?
         (range 1 10))
 
-; TODO: reverse decision from #9
+; TODO: see #27
 ;(filter
 ;  even?
 ;  (range 1 10))
@@ -25,15 +25,16 @@
   {:thing1 thing1
    :thing2 thing2})
 
-; TODO: move arg vector to same line
-;(defn foo
-;  [x] (bar x))
+(defn foo [x]
+  (bar x))
 
-; TODO: move the dispatch-val to the same line
-;(defmethod foo
-;  :bar
-;  [x]
-;  (baz x))
+(defmethod foo :bar
+  [x]
+  (baz x))
+
+(defmethod foo :bar
+  [x]
+  (baz x))
 
 (defn foo
   "I have two arities."
