@@ -312,7 +312,7 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style indentStyle) in
 				}
 			case indentLet, indentCond, indentCond2, indentCondp:
 				off := indentExtraOffsets[style]
-				if idxSemantic <= off {
+				if idxSemantic >= 1 && idxSemantic <= off {
 					// Fall back to indentListSpecial in this case.
 					// Example:
 					// (case
