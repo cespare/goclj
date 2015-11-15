@@ -16,6 +16,7 @@ func TestLet(t *testing.T)        { testFixture(t, "let.clj") }
 
 func TestStyleGuide(t *testing.T) { testTransform(t, "styleguide_bad.clj", "styleguide_good.clj") }
 func TestNewline(t *testing.T)    { testTransform(t, "newline_before.clj", "newline_after.clj") }
+func TestRequire(t *testing.T)    { testTransform(t, "require_before.clj", "require_after.clj") }
 
 func TestIndent(t *testing.T)  { testFixture(t, "indent.clj") }
 func TestIssue5(t *testing.T)  { testFixture(t, "issue5.clj") }
