@@ -17,6 +17,7 @@ type Printer struct {
 	IndentChar byte
 
 	specialIndent map[parse.Node]indentStyle
+	docstrings    map[*parse.StringNode]struct{}
 }
 
 // NewPrinter creates a printer to the given writer.
@@ -25,6 +26,7 @@ func NewPrinter(w io.Writer) *Printer {
 		bufWriter:     &bufWriter{bufio.NewWriter(w)},
 		IndentChar:    ' ',
 		specialIndent: make(map[parse.Node]indentStyle),
+		docstrings:    make(map[*parse.StringNode]struct{}),
 	}
 }
 
@@ -43,6 +45,9 @@ func (p *Printer) PrintTree(t *parse.Tree) (err error) {
 		}
 	}()
 	applyTransforms(t)
+	for _, node := range t.Roots {
+		p.markDocstrings(node)
+	}
 	p.printSequence(t.Roots, 0, indentNormal)
 	return p.bw.Flush()
 }
@@ -108,7 +113,12 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		w = p.printSequence(node.Nodes, w, indentNormal)
 		return w + p.WriteString("}")
 	case *parse.StringNode:
-		return w + p.WriteString(`"`+node.Val+`"`)
+		val := node.Val
+		if _, ok := p.docstrings[node]; ok {
+			val = p.alignDocstring(val, w)
+			delete(p.docstrings, node)
+		}
+		return w + p.WriteString(`"`+val+`"`)
 	case *parse.SymbolNode:
 		return w + p.WriteString(node.Val)
 	case *parse.SyntaxQuoteNode:
