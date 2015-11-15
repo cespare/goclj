@@ -43,12 +43,11 @@
   ([x y]
    (+ x y)))
 
-; TODO: Fix #6
-;(defn foo
-;  "Hello there. This is
-;a multi-line docstring."
-;  []
-;  (bar))
+(defn foo
+  "Hello there. This is
+  a multi-line docstring."
+  []
+  (bar))
 
 (foo (bar baz) quux)
 (foo (bar baz) quux)
