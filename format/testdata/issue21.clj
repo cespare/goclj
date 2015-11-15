@@ -13,6 +13,13 @@
     bar
   baz)
 
+(cond-> 1
+  true inc
+  false
+    (* 42)
+  (= 2 2)
+    (* 3))
+
 (condp = 123
   abc
     foo

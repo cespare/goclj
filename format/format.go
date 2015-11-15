@@ -216,10 +216,10 @@ func chooseIndent(nodes []parse.Node) indentStyle {
 		return indentList
 	case *parse.SymbolNode:
 		switch node.Val {
-		case "cond", "cond->", "cond->>":
+		case "cond":
 			return indentCond
-		case "case":
-			return indentCase
+		case "case", "cond->", "cond->>":
+			return indentCond2
 		case "condp":
 			return indentCondp
 		}
@@ -278,14 +278,14 @@ const (
 	indentListSpecial                    // (defn foo []\nbar) ; bar is indented 2
 	indentLet                            // (let [foo\nbar]) ; bar is indented two beyond foo
 	indentCond                           // like indentLet but starting on the second element
-	indentCase                           // like indentLet but starting on the third element
+	indentCond2                          // like indentLet but starting on the third element
 	indentCondp                          // like indentLet but starting on the fourth element
 )
 
 var indentExtraOffsets = [...]int{
 	indentLet:   0,
 	indentCond:  1,
-	indentCase:  2,
+	indentCond2: 2,
 	indentCondp: 3,
 }
 
@@ -310,7 +310,7 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style indentStyle) in
 				if i == 1 {
 					w++
 				}
-			case indentLet, indentCond, indentCase, indentCondp:
+			case indentLet, indentCond, indentCond2, indentCondp:
 				off := indentExtraOffsets[style]
 				if idxSemantic <= off {
 					// Fall back to indentListSpecial in this case.
@@ -342,7 +342,7 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style indentStyle) in
 			if i == 1 {
 				w = firstIndent + 1
 			}
-		case indentListSpecial, indentCond, indentCase, indentCondp:
+		case indentListSpecial, indentCond, indentCond2, indentCondp:
 			if i == 1 {
 				w++
 			}
