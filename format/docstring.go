@@ -15,7 +15,7 @@ func (p *Printer) markDocstrings(n parse.Node) {
 	if len(nodes) < 3 {
 		return
 	}
-	if _, ok := nodes[1].(*parse.SymbolNode); !ok {
+	if !goclj.Symbol(nodes[1]) {
 		return
 	}
 	for _, node := range nodes[2:] {

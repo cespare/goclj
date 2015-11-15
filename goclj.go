@@ -50,8 +50,28 @@ func FnFormKeyword(node parse.Node, kw ...string) bool {
 	return false
 }
 
+func Symbol(node parse.Node) bool {
+	_, ok := node.(*parse.SymbolNode)
+	return ok
+}
+
 func Newline(node parse.Node) bool {
 	_, ok := node.(*parse.NewlineNode)
+	return ok
+}
+
+func Vector(node parse.Node) bool {
+	_, ok := node.(*parse.VectorNode)
+	return ok
+}
+
+func Keyword(node parse.Node) bool {
+	_, ok := node.(*parse.KeywordNode)
+	return ok
+}
+
+func Comment(node parse.Node) bool {
+	_, ok := node.(*parse.CommentNode)
 	return ok
 }
 

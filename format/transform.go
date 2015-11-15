@@ -66,7 +66,10 @@ func removeTrailingNewlines(n parse.Node) {
 	switch n.(type) {
 	case *parse.ListNode, *parse.MapNode, *parse.VectorNode, *parse.FnLiteralNode, *parse.SetNode:
 		for ; len(nodes) > 0; nodes = nodes[:len(nodes)-1] {
-			if _, ok := nodes[len(nodes)-1].(*parse.NewlineNode); !ok {
+			if len(nodes) >= 2 && goclj.Comment(nodes[len(nodes)-2]) {
+				break
+			}
+			if !goclj.Newline(nodes[len(nodes)-1]) {
 				break
 			}
 		}
@@ -92,7 +95,7 @@ func fixDefnArglist(defn parse.Node) {
 	if !goclj.Newline(nodes[2]) || goclj.Newline(nodes[4]) {
 		return
 	}
-	if _, ok := nodes[3].(*parse.VectorNode); !ok {
+	if !goclj.Vector(nodes[3]) {
 		return
 	}
 	// Move the newline to be after the arglist.
@@ -115,7 +118,7 @@ func fixDefmethodDispatchVal(defmethod parse.Node) {
 	if !goclj.Newline(nodes[2]) {
 		return
 	}
-	if _, ok := nodes[3].(*parse.KeywordNode); !ok {
+	if !goclj.Keyword(nodes[3]) {
 		return
 	}
 	// Move the dispatch-val up to the same line.
@@ -169,7 +172,7 @@ func (l importRequireList) Less(i, j int) bool {
 		if s2, ok := n2.(*parse.SymbolNode); ok {
 			return s1.Val < s2.Val
 		}
-		if _, ok := n2.(*parse.VectorNode); ok {
+		if goclj.Vector(n2) {
 			return false
 		}
 		return true

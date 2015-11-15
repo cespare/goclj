@@ -25,4 +25,3 @@
     foo
   def
     bar)
-
