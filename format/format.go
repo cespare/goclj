@@ -215,6 +215,14 @@ func chooseIndent(nodes []parse.Node) indentStyle {
 	case *parse.KeywordNode:
 		return indentList
 	case *parse.SymbolNode:
+		switch node.Val {
+		case "cond", "cond->", "cond->>":
+			return indentCond
+		case "case":
+			return indentCase
+		case "condp":
+			return indentCondp
+		}
 		if special(node) {
 			return indentListSpecial
 		}
@@ -269,7 +277,17 @@ const (
 	indentList                           // (foo bar\nbaz) ; baz is below bar
 	indentListSpecial                    // (defn foo []\nbar) ; bar is indented 2
 	indentLet                            // (let [foo\nbar]) ; bar is indented two beyond foo
+	indentCond                           // like indentLet but starting on the second element
+	indentCase                           // like indentLet but starting on the third element
+	indentCondp                          // like indentLet but starting on the fourth element
 )
+
+var indentExtraOffsets = [...]int{
+	indentLet:   0,
+	indentCond:  1,
+	indentCase:  2,
+	indentCondp: 3,
+}
 
 func (p *Printer) printSequence(nodes []parse.Node, w int, style indentStyle) int {
 	var (
@@ -280,9 +298,10 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style indentStyle) in
 		// used for IndentList, for tracking indent based on nodes[0]
 		firstIndent int
 
-		// used for IndentLet, for counting semantic tokens
+		// used by IndentLet, indexCond, indexCase, and indexCondp
+		// for counting semantic tokens
 		idxSemantic int
-		letIndent   = false
+		extraIndent = false
 	)
 	for i, n := range nodes {
 		if goclj.Newline(n) {
@@ -291,10 +310,22 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style indentStyle) in
 				if i == 1 {
 					w++
 				}
-			case indentLet:
-				if idxSemantic%2 == 1 {
+			case indentLet, indentCond, indentCase, indentCondp:
+				off := indentExtraOffsets[style]
+				if idxSemantic <= off {
+					// Fall back to indentListSpecial in this case.
+					// Example:
+					// (case
+					//    foo
+					//    "a" b)
+					// The 'foo' is indented like indentListSpecial.
+					if i == 1 {
+						w++
+					}
+				}
+				if idxSemantic > off && (idxSemantic-off)%2 == 1 {
 					w += 2
-					letIndent = true
+					extraIndent = true
 				}
 			}
 			w2 = w
@@ -311,7 +342,7 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style indentStyle) in
 			if i == 1 {
 				w = firstIndent + 1
 			}
-		case indentListSpecial:
+		case indentListSpecial, indentCond, indentCase, indentCondp:
 			if i == 1 {
 				w++
 			}
@@ -328,9 +359,9 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style indentStyle) in
 		}
 		needIndent = false
 		needSpace = true
-		if letIndent {
+		if extraIndent {
 			w -= 2
-			letIndent = false
+			extraIndent = false
 		}
 	}
 	// We need to put in a trailing indent here; the next token cannot be a newline

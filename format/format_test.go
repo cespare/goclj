@@ -27,6 +27,7 @@ func TestIssue16(t *testing.T) { testFixture(t, "issue16.clj") }
 func TestIssue17(t *testing.T) { testFixture(t, "issue17.clj") }
 func TestIssue18(t *testing.T) { testFixture(t, "issue18.clj") }
 func TestIssue19(t *testing.T) { testFixture(t, "issue19.clj") }
+func TestIssue21(t *testing.T) { testFixture(t, "issue21.clj") }
 func TestIssue23(t *testing.T) { testFixture(t, "issue23.clj") }
 
 func TestIssue6(t *testing.T)  { testTransform(t, "issue6_before.clj", "issue6_after.clj") }
