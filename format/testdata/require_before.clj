@@ -1,6 +1,6 @@
 (ns foo.bar
   (:require ; z
-            [z :as z] ; another
+            (z :as z) ; another
             ; a
             [a :refer [x y z]] ; blah
             ; after

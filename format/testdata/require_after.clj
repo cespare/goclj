@@ -2,7 +2,7 @@
   (:require ; a
             [a :refer [x y z]] ; blah
             ; z
-            [z :as z] ; another
+            (z :as z) ; another
             ; after
             )
   (:import java.io.DataInputStream

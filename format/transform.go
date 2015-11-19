@@ -66,7 +66,7 @@ func sortImportRequire(n *parse.ListNode) {
 			afterSemanticNode = true
 		}
 	}
-	sort.Sort(sorted)
+	sort.Stable(sorted)
 	newNodes := []parse.Node{nodes[0]}
 	for _, ir := range sorted {
 		for _, cn := range ir.CommentsAbove {
@@ -205,33 +205,43 @@ func (l importRequireList) Len() int      { return len(l) }
 func (l importRequireList) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
 
 func (l importRequireList) Less(i, j int) bool {
+	// Some case are nonsenical; don't particularly care how those are sorted.
 	n1, n2 := l[i].Node, l[j].Node
 	if s1, ok := n1.(*parse.SymbolNode); ok {
 		if s2, ok := n2.(*parse.SymbolNode); ok {
 			return s1.Val < s2.Val
 		}
 		if goclj.Vector(n2) {
-			return true
+			return true // a < [b]
 		}
-		return true
+		return true // a < 3
 	}
-	if v1, ok := n1.(*parse.VectorNode); ok {
-		if v2, ok := n2.(*parse.VectorNode); ok {
-			if len(v1.Nodes) == 0 {
-				return true
+	if listOrVector(n1) {
+		if listOrVector(n2) {
+			children1, children2 := n1.Children(), n2.Children()
+			if len(children1) == 0 {
+				return true // [] < [a]
 			}
-			if len(v2.Nodes) == 0 {
-				return false
+			if len(children2) == 0 {
+				return false // [a] >= []
 			}
-			if p1, ok := v1.Nodes[0].(*parse.SymbolNode); ok {
-				if p2, ok := v2.Nodes[0].(*parse.SymbolNode); ok {
-					return p1.Val < p2.Val
+			if p1, ok := children1[0].(*parse.SymbolNode); ok {
+				if p2, ok := children2[0].(*parse.SymbolNode); ok {
+					return p1.Val < p2.Val // [a] < [b]
 				}
-				return true
+				return true // [a] < [3]
 			}
-			return false
+			return false // [3] >= [a]
 		}
-		return false
+		return false // [a] >= 3
+	}
+	return false // 3 >= 3
+}
+
+func listOrVector(node parse.Node) bool {
+	switch node.(type) {
+	case *parse.ListNode, *parse.VectorNode:
+		return true
 	}
 	return false
 }
