@@ -64,12 +64,18 @@ var (
 // processFile formats the given file.
 // If in == nil, the input is the file of the given name.
 func processFile(filename string, in io.Reader, list, write bool) error {
+	var perm os.FileMode = 0644
 	if in == nil {
 		f, err := os.Open(filename)
 		if err != nil {
 			return err
 		}
 		defer f.Close()
+		stat, err := f.Stat()
+		if err != nil {
+			return err
+		}
+		perm = stat.Mode().Perm()
 		in = f
 	}
 
@@ -96,7 +102,7 @@ func processFile(filename string, in io.Reader, list, write bool) error {
 		fmt.Println(filename)
 	}
 	if write {
-		if err := ioutil.WriteFile(filename, buf2.Bytes(), 0644); err != nil {
+		if err := ioutil.WriteFile(filename, buf2.Bytes(), perm); err != nil {
 			return err
 		}
 	}
@@ -111,7 +117,6 @@ func walkDir(path string, list, write bool) {
 		if err != nil {
 			return err
 		}
-		fmt.Println(path, f.IsDir())
 		if f.IsDir() {
 			return nil
 		}
