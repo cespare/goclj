@@ -14,21 +14,16 @@ import (
 
 func main() {
 	var (
-		indentCharFlag = flag.String("indentchar", " ", "character to use for indenting")
-		listDifferent  = flag.Bool("l", false, "print files whose formatting differs from cljfmt's")
-		writeFile      = flag.Bool("w", false, "write result to (source) file instead of stdout")
+		listDifferent = flag.Bool("l", false, "print files whose formatting differs from cljfmt's")
+		writeFile     = flag.Bool("w", false, "write result to (source) file instead of stdout")
 	)
 	flag.Parse()
-	if len(*indentCharFlag) != 1 {
-		fatalf("-indentchar arg must have length 1")
-	}
-	indentChar := (*indentCharFlag)[0]
 	if flag.NArg() < 1 {
 		usage()
 	}
 	if *listDifferent || *writeFile {
 		for _, filename := range flag.Args() {
-			if err := writeFormatted(filename, indentChar, *listDifferent, *writeFile); err != nil {
+			if err := writeFormatted(filename, *listDifferent, *writeFile); err != nil {
 				fatal(err)
 			}
 		}
@@ -44,13 +39,13 @@ func main() {
 		fatal(err)
 	}
 	p := format.NewPrinter(os.Stdout)
-	p.IndentChar = indentChar
+	p.IndentChar = ' '
 	if err := p.PrintTree(t); err != nil {
 		fatal(err)
 	}
 }
 
-func writeFormatted(filename string, indentChar byte, listDifferent, writeFile bool) error {
+func writeFormatted(filename string, listDifferent, writeFile bool) error {
 	tw, err := ioutil.TempFile(filepath.Dir(filename), "cljfmt-")
 	if err != nil {
 		return err
@@ -63,7 +58,7 @@ func writeFormatted(filename string, indentChar byte, listDifferent, writeFile b
 		return err
 	}
 	p := format.NewPrinter(tw)
-	p.IndentChar = indentChar
+	p.IndentChar = ' '
 	if err := p.PrintTree(t); err != nil {
 		return err
 	}
