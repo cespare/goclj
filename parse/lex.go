@@ -51,7 +51,6 @@ const (
 	tokApostrophe   // '
 	tokAtSign       // @
 	tokBacktick     // `
-	tokBool         // true, false
 	tokCharLiteral  // \c, \newline, etc
 	tokCircumflex   // ^
 	tokComment      // ; foobar
@@ -60,7 +59,6 @@ const (
 	tokLeftBrace    // {
 	tokLeftBracket  // [
 	tokLeftParen    // (
-	tokNil          // nil
 	tokNumber       // any numeric literal; may be invalid (parser will determine)
 	tokOctothorpe   // # (only used for tags; dispatch tokens are separate)
 	tokRightBrace   // }
@@ -78,7 +76,6 @@ var tokTypeToName = map[tokType]string{
 	tokApostrophe:   "apostrophe",
 	tokAtSign:       "at-sign",
 	tokBacktick:     "backtick",
-	tokBool:         "bool",
 	tokCharLiteral:  "char-literal",
 	tokCircumflex:   "circumflex",
 	tokComment:      "comment",
@@ -89,7 +86,6 @@ var tokTypeToName = map[tokType]string{
 	tokLeftBrace:    "left-brace",
 	tokLeftBracket:  "left-bracket",
 	tokLeftParen:    "left-paren",
-	tokNil:          "nil",
 	tokNumber:       "number",
 	tokOctothorpe:   "octothorpe",
 	tokRightBrace:   "right-brace",
@@ -111,7 +107,7 @@ func (t tokType) String() string {
 
 func (t token) String() string {
 	switch t.typ {
-	case tokError, tokBool, tokCharLiteral, tokComment, tokKeyword, tokNumber, tokDispatch, tokString, tokSymbol:
+	case tokError, tokCharLiteral, tokComment, tokKeyword, tokNumber, tokDispatch, tokString, tokSymbol:
 		return fmt.Sprintf("<%s@%s>(%q)", t.typ, t.pos, t.val)
 	}
 	return fmt.Sprintf("<%s@%s>", t.typ, t.pos)
@@ -452,34 +448,3 @@ func isSymbolChar(r rune) bool {
 	}
 	return false
 }
-
-//func isNumberChar(r rune) bool {
-//// There are many ways to write number literals in Clojure. Read http://clojure.org/reader and
-//// http://docs.oracle.com/javase/tutorial/java/nutsandbolts/datatypes.html for more information.
-////
-//// Notes: the following are supported in Java but not Clojure:
-//// - Binary literals (0b101)
-//// - f/F/d/D suffixes
-//// - Underscores inside numbers
-
-//if r >= '0' && r <= '9' {
-//return true
-//}
-//switch r {
-//case '.':
-//return true
-//case '+', '-': // signs as a prefix or on the exponent
-//return true
-//case 'e', 'E': // exponent
-//return true
-//case 'r': // specify radix
-//return true
-//case 'M', 'N': // suffixes for BigDecimal or BigInt
-//return true
-//case '/': // ratios
-//return true
-//case 'x': // hex
-//return true
-//}
-//return false
-//}
