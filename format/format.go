@@ -392,11 +392,16 @@ func (bw *bufWriter) Write(b []byte) (int, error) {
 }
 
 func (bw *bufWriter) WriteString(s string) int {
-	bw.Write([]byte(s))
-	return len(s)
+	n, err := bw.bw.WriteString(s)
+	if err != nil {
+		panic(bufErr{err})
+	}
+	return n
 }
 func (bw *bufWriter) WriteByte(b byte) int {
-	bw.Write([]byte{b})
+	if err := bw.bw.WriteByte(b); err != nil {
+		panic(bufErr{err})
+	}
 	return 1
 }
 
