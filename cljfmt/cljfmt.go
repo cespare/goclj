@@ -120,7 +120,9 @@ func walkDir(path string, list, write bool) {
 		if f.IsDir() {
 			return nil
 		}
-		if name := f.Name(); strings.HasPrefix(name, ".") || !strings.HasSuffix(name, ".clj") {
+		name := f.Name()
+		if strings.HasPrefix(name, ".") ||
+			!strings.HasSuffix(name, ".clj") {
 			return nil
 		}
 		return processFile(path, nil, list, write)

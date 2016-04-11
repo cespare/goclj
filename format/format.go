@@ -52,8 +52,8 @@ func (p *Printer) PrintTree(t *parse.Tree) (err error) {
 	return p.bw.Flush()
 }
 
-// printNode prints a representation of node using w, the given indent level, as a baseline.
-// It returns the new indent.
+// printNode prints a representation of node using w, the given indent level
+// as a baseline. It returns the new indent.
 func (p *Printer) printNode(node parse.Node, w int) int {
 	switch node := node.(type) {
 	case *parse.BoolNode:
@@ -150,7 +150,8 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 	return 0
 }
 
-// TODO: Create a simple rules interface or something to easily specify the special rules below.
+// TODO: Create a simple rules interface or something to easily specify the
+// special rules below.
 
 func (p *Printer) applySpecialIndentRules(node *parse.ListNode) {
 	if len(node.Nodes) == 0 {
@@ -364,8 +365,8 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style indentStyle) in
 			extraIndent = false
 		}
 	}
-	// We need to put in a trailing indent here; the next token cannot be a newline
-	// (it will need to be the closing delimiter for this sequence).
+	// We need to put in a trailing indent here; the next token cannot be a
+	// newline (it will need to be the closing delimiter for this sequence).
 	if needIndent {
 		p.WriteString(strings.Repeat(string(p.IndentChar), w))
 	}

@@ -11,6 +11,8 @@ import (
 	"github.com/cespare/goclj/parse"
 )
 
+// TODO: Rewrite using subtests after Go 1.7.
+
 func TestSimpleFile(t *testing.T) { testFixture(t, "simple1.clj") }
 func TestLet(t *testing.T)        { testFixture(t, "let.clj") }
 
@@ -57,7 +59,8 @@ func testTransform(t *testing.T, before, after string) {
 	if !bytes.Equal(buf.Bytes(), want) {
 		gotFormatted := formatLines(buf.Bytes())
 		wantFormatted := formatLines(want)
-		t.Fatalf("Formatted %s incorrectly: got\n%swant\n%s", sourceFile, gotFormatted, wantFormatted)
+		t.Fatalf("Formatted %s incorrectly: got\n%swant\n%s",
+			sourceFile, gotFormatted, wantFormatted)
 	}
 }
 
