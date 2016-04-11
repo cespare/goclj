@@ -13,10 +13,19 @@ import (
 // A Printer writes a parse tree with proper indentation.
 type Printer struct {
 	*bufWriter
-	IndentChar byte
+	// IndentChar is the character used for indentation
+	// (by default, ' ' is used).
+	IndentChar rune
+	// IndentSpecial are extra names that are given two-space indentation
+	// regardless of length (the same way that defn, let, with* and many
+	// others are).
+	IndentSpecial []string
 
-	specialIndent map[parse.Node]indentStyle
-	docstrings    map[*parse.StringNode]struct{}
+	// indentSpecialSet is the union of indentSpecialDefaults and
+	// IndentSpecial.
+	indentSpecialSet map[string]struct{}
+	specialIndent    map[parse.Node]indentStyle
+	docstrings       map[*parse.StringNode]struct{}
 }
 
 // NewPrinter creates a printer to the given writer.
@@ -31,6 +40,13 @@ func NewPrinter(w io.Writer) *Printer {
 
 // PrintTree writes t to p's writer.
 func (p *Printer) PrintTree(t *parse.Tree) (err error) {
+	p.indentSpecialSet = make(map[string]struct{})
+	for _, s := range indentSpecialDefaults {
+		p.indentSpecialSet[s] = struct{}{}
+	}
+	for _, s := range p.IndentSpecial {
+		p.indentSpecialSet[s] = struct{}{}
+	}
 	defer func() {
 		if e := recover(); e != nil {
 			switch e := e.(type) {
@@ -70,7 +86,7 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		return p.printNode(node.Node, w)
 	case *parse.FnLiteralNode:
 		w += p.WriteString("#(")
-		w = p.printSequence(node.Nodes, w, chooseIndent(node.Nodes))
+		w = p.printSequence(node.Nodes, w, p.chooseIndent(node.Nodes))
 		return w + p.WriteString(")")
 	case *parse.IgnoreFormNode:
 		w += p.WriteString("#_")
@@ -84,7 +100,7 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		if style, ok = p.specialIndent[node]; ok {
 			delete(p.specialIndent, node)
 		} else {
-			style = chooseIndent(node.Nodes)
+			style = p.chooseIndent(node.Nodes)
 		}
 		w += p.WriteString("(")
 		w = p.printSequence(node.Nodes, w, style)
@@ -207,7 +223,7 @@ func (p *Printer) applySpecialDeftype(nodes []parse.Node) {
 	}
 }
 
-func chooseIndent(nodes []parse.Node) indentStyle {
+func (p *Printer) chooseIndent(nodes []parse.Node) indentStyle {
 	if len(nodes) == 0 {
 		return indentNormal
 	}
@@ -223,7 +239,7 @@ func chooseIndent(nodes []parse.Node) indentStyle {
 		case "condp":
 			return indentCondp
 		}
-		if special(node) {
+		if p.special(node) {
 			return indentListSpecial
 		}
 		return indentList
@@ -231,15 +247,9 @@ func chooseIndent(nodes []parse.Node) indentStyle {
 	return indentNormal
 }
 
-var indentSpecialPrefixes = []string{
-	"def", "let", "send", "with",
-}
-
-var indentSpecial = make(map[string]struct{})
-
-func init() {
+var (
 	// TODO(caleb): I wish I had written down where I got this list...
-	for _, word := range []string{
+	indentSpecialDefaults = []string{
 		"as->", "binding", "bound-fn", "case", "catch", "cond->", "cond->>",
 		"condp", "def", "definline", "definterface", "defmacro", "defmethod",
 		"defmulti", "defn", "defn-", "defonce", "defprotocol", "defrecord",
@@ -250,21 +260,15 @@ func init() {
 		"when-not", "when-some", "while", "with-bindings", "with-in-str",
 		"with-local-vars", "with-open", "with-precision", "with-redefs",
 		"with-redefs-fn", "with-test",
-	} {
-		indentSpecial[word] = struct{}{}
 	}
-}
-
-func symbolName(sym string) string {
-	if i := strings.LastIndex(sym, "/"); i >= 0 {
-		return sym[i+1:]
+	indentSpecialPrefixes = []string{
+		"def", "let", "send", "with",
 	}
-	return sym
-}
+)
 
-func special(node *parse.SymbolNode) bool {
+func (p *Printer) special(node *parse.SymbolNode) bool {
 	name := symbolName(node.Val)
-	if _, ok := indentSpecial[name]; ok {
+	if _, ok := p.indentSpecialSet[name]; ok {
 		return true
 	}
 	for _, prefix := range indentSpecialPrefixes {
@@ -273,6 +277,13 @@ func special(node *parse.SymbolNode) bool {
 		}
 	}
 	return false
+}
+
+func symbolName(sym string) string {
+	if i := strings.LastIndex(sym, "/"); i >= 0 {
+		return sym[i+1:]
+	}
+	return sym
 }
 
 type indentStyle int

@@ -38,29 +38,61 @@ func TestIssue7(t *testing.T)  { testTransform(t, "issue7_before.clj", "issue7_a
 func TestIssue25(t *testing.T) { testTransform(t, "issue25_before.clj", "issue25_after.clj") }
 func TestIssue26(t *testing.T) { testTransform(t, "issue26_before.clj", "issue26_after.clj") }
 
+func TestSpecialIndent(t *testing.T) {
+	tree := parseFile(t, "special.clj")
+	var buf bytes.Buffer
+	if err := NewPrinter(&buf).PrintTree(tree); err != nil {
+		t.Fatal(err)
+	}
+	want := readFile(t, "special.clj")
+	check(t, "special.clj", buf.Bytes(), want)
+
+	buf.Reset()
+	p := NewPrinter(&buf)
+	p.IndentSpecial = []string{"delete", "up"}
+	if err := p.PrintTree(tree); err != nil {
+		t.Fatal(err)
+	}
+	want = readFile(t, "special_custom.clj")
+	check(t, "special.clj (with custom IndentSpecial)", buf.Bytes(), want)
+}
+
 func testFixture(t *testing.T, filename string) {
 	testTransform(t, filename, filename)
 }
 
 func testTransform(t *testing.T, before, after string) {
-	sourceFile := filepath.Join("testdata", before)
-	tree, err := parse.File(sourceFile, true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tree := parseFile(t, before)
 	var buf bytes.Buffer
 	if err := NewPrinter(&buf).PrintTree(tree); err != nil {
 		t.Fatal(err)
 	}
-	want, err := ioutil.ReadFile(filepath.Join("testdata", after))
+	want := readFile(t, after)
+	check(t, before, buf.Bytes(), want)
+}
+
+func parseFile(t *testing.T, name string) *parse.Tree {
+	tree, err := parse.File(filepath.Join("testdata", name), true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(buf.Bytes(), want) {
-		gotFormatted := formatLines(buf.Bytes())
+	return tree
+}
+
+func readFile(t *testing.T, name string) []byte {
+	b, err := ioutil.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
+}
+
+func check(t *testing.T, desc string, got, want []byte) {
+	if !bytes.Equal(got, want) {
+		gotFormatted := formatLines(got)
 		wantFormatted := formatLines(want)
-		t.Fatalf("Formatted %s incorrectly: got\n%swant\n%s",
-			sourceFile, gotFormatted, wantFormatted)
+		t.Errorf("formatted %s incorrectly: got\n%swant\n%s",
+			desc, gotFormatted, wantFormatted)
 	}
 }
 
