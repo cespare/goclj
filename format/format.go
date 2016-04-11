@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 
 	"github.com/cespare/goclj"
@@ -232,9 +231,9 @@ func chooseIndent(nodes []parse.Node) indentStyle {
 	return indentNormal
 }
 
-var indentSpecialRegex = regexp.MustCompile(
-	`^(def.*|let.*|send.*|with.*)$`,
-)
+var indentSpecialPrefixes = []string{
+	"def", "let", "send", "with",
+}
 
 var indentSpecial = make(map[string]struct{})
 
@@ -268,7 +267,12 @@ func special(node *parse.SymbolNode) bool {
 	if _, ok := indentSpecial[name]; ok {
 		return true
 	}
-	return indentSpecialRegex.MatchString(name)
+	for _, prefix := range indentSpecialPrefixes {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 type indentStyle int
