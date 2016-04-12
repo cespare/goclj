@@ -2,33 +2,6 @@ package parse
 
 import "fmt"
 
-/*
-BoolNode
-CharacterNode
-CommentNode
-DerefNode
-FnLiteralNode
-ReaderDiscardNode
-KeywordNode
-ListNode
-MapNode
-MetadataNode
-NewlineNode
-NilNode
-NumberNode
-QuoteNode
-RegexNode
-SetNode
-StringNode
-SymbolNode
-SyntaxQuoteNode
-TagNode
-UnquoteNode
-UnquoteSpliceNode
-VarQuoteNode
-VectorNode
-*/
-
 type Node interface {
 	Position() *Pos
 	String() string // A non-recursive string representation
