@@ -178,8 +178,8 @@ func (l *lexer) back() {
 	l.lastPos = nil
 }
 
-// scanWhile scans while f(current rune) is true. It does not include the first value for which the predicate
-// returns false.
+// scanWhile scans while f(current rune) is true.
+// It does not include the first value for which the predicate returns false.
 func (l *lexer) scanWhile(f func(r rune) bool) {
 	for {
 		r, eof := l.next()
@@ -193,7 +193,8 @@ func (l *lexer) scanWhile(f func(r rune) bool) {
 	}
 }
 
-// scanUntil scans until a rune in set is reached (or EOF). It does not consume the discovered rune.
+// scanUntil scans until a rune in set is reached (or EOF).
+// It does not consume the discovered rune.
 func (l *lexer) scanUntil(set string) {
 	runes := []rune(set)
 	for {
@@ -436,8 +437,9 @@ func lexDispatch(l *lexer) stateFn {
 }
 
 func lexNumber(l *lexer) stateFn {
-	// There are many different chars that can appear in a number, but it is a subset of symbol chars. Tokenize
-	// this way to match the behavior of the clojure compiler. For example: '(+ 3foo)' produces the invalid
+	// There are many different chars that can appear in a number, but it is
+	// a subset of symbol chars. Tokenize this way to match the behavior of
+	// the clojure compiler. For example: '(+ 3foo)' produces the invalid
 	// number '3foo' rather than parsing the same way as '(+ 3 foo)'.
 	l.scanWhile(isSymbolChar)
 	l.emit(tokNumber)
@@ -451,17 +453,17 @@ func lexSymbol(l *lexer) stateFn {
 }
 
 func isWhitespace(r rune) bool {
-	return (unicode.IsSpace(r) && r != '\n') || r == ','
+	return unicode.IsSpace(r) || r == ','
 }
 
-// Decent approximation for now
+// isSymbolChar reports whether r is allowable in a Clojure symbol.
 func isSymbolChar(r rune) bool {
-	if unicode.IsLetter(r) || unicode.IsDigit(r) {
-		return true
+	if isWhitespace(r) {
+		return false
 	}
 	switch r {
-	case '*', '+', '!', '-', '_', '?', '/', '.', ':', '$', '=', '>', '<', '&', '#':
-		return true
+	case '"', ';', '@', '^', '~', '(', ')', '[', ']', '{', '}', '\\':
+		return false
 	}
-	return false
+	return true
 }

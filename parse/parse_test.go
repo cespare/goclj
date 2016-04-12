@@ -42,6 +42,10 @@ var testCases = []struct {
 	{"#=foo", "eval"},
 	{"#^foo", "metadata"},
 	{"#! hello!", `comment("#! hello!")`},
+
+	// issue 35
+	{"a%b%", "sym(a%b%)"},
+	{":100%>50%", "keyword(:100%>50%)"},
 }
 
 func TestAll(t *testing.T) {
