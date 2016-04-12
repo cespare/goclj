@@ -72,7 +72,7 @@ func testTransform(t *testing.T, before, after string) {
 }
 
 func parseFile(t *testing.T, name string) *parse.Tree {
-	tree, err := parse.File(filepath.Join("testdata", name), true)
+	tree, err := parse.File(filepath.Join("testdata", name), parse.IncludeNonSemantic)
 	if err != nil {
 		t.Fatal(err)
 	}
