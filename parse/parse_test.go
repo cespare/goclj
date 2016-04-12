@@ -39,7 +39,7 @@ var testCases = []struct {
 
 func TestAll(t *testing.T) {
 	for _, tc := range testCases {
-		tree, err := Reader(strings.NewReader(tc.s), "temp", true)
+		tree, err := Reader(strings.NewReader(tc.s), "temp", IncludeNonSemantic)
 		if err != nil {
 			t.Fatalf("Error parsing %q: %s", tc.s, err)
 		}

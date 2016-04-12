@@ -107,9 +107,18 @@ func (t *Tree) unexpected(tok token) { t.errorf(tok.pos, "unexpected token %q", 
 
 func (t *Tree) unexpectedEOF(tok token) { t.errorf(tok.pos, "unexpected EOF") }
 
-func Reader(r io.Reader, filename string, includeNonSemantic bool) (*Tree, error) {
+// ParseOpts is a bitset of parsing options for Reader and File.
+type ParseOpts uint
+
+const (
+	// IncludeNonSemantic makes the parser include non-semantic nodes:
+	// CommentNodes and NewlineNodes.
+	IncludeNonSemantic ParseOpts = 1 << iota
+)
+
+func Reader(r io.Reader, filename string, opts ParseOpts) (*Tree, error) {
 	t := &Tree{
-		includeNonSemantic: includeNonSemantic,
+		includeNonSemantic: opts&IncludeNonSemantic != 0,
 		lex:                lex(filename, bufio.NewReader(r)),
 	}
 	if err := t.Parse(); err != nil {
@@ -118,17 +127,17 @@ func Reader(r io.Reader, filename string, includeNonSemantic bool) (*Tree, error
 	return t, nil
 }
 
-func File(filename string, includeNonSemantic bool) (*Tree, error) {
+func File(filename string, opts ParseOpts) (*Tree, error) {
 	f, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	return Reader(f, filename, includeNonSemantic)
+	return Reader(f, filename, opts)
 }
 
-// parse parses the next top-level item from the token stream. It returns nil if there are no non-EOF tokens
-// left in the stream.
+// parse parses the next top-level item from the token stream.
+// It returns nil if there are no non-EOF tokens left in the stream.
 func (t *Tree) parse() Node {
 	for {
 		switch tok := t.next(); tok.typ {

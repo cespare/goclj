@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -26,14 +25,10 @@ Flags:
 	flag.PrintDefaults()
 }
 
-type dotConfig struct {
-	IndentSpecial []string `json:"indent-special"`
-}
-
 type config struct {
-	dotConfig *dotConfig
-	list      bool
-	write     bool
+	indentSpecial []string
+	list          bool
+	write         bool
 }
 
 func main() {
@@ -52,7 +47,8 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	conf.dotConfig = parseDotConfig(configFile)
+	conf.parseDotConfig(configFile)
+	fmt.Println(conf.indentSpecial)
 
 	if flag.NArg() == 0 {
 		if conf.write {
@@ -95,23 +91,22 @@ func (pf *pathFlag) String() string {
 	return pf.p
 }
 
-func parseDotConfig(pf pathFlag) *dotConfig {
-	conf := new(dotConfig)
+func (c *config) parseDotConfig(pf pathFlag) {
 	if pf.p == "" {
-		return conf
+		return
 	}
 	f, err := os.Open(pf.p)
 	if err != nil {
 		if !os.IsNotExist(err) || pf.set {
 			log.Println("warning: could not open config", err)
 		}
-		return conf
+		return
 	}
 	defer f.Close()
-	if err := json.NewDecoder(f).Decode(conf); err != nil {
-		log.Fatalf("cannot decode config %s: %s", pf.p, err)
+	c.indentSpecial, err = parseDotConfig(f, pf.p)
+	if err != nil {
+		log.Fatalf("error parsing config %s: %s", pf.p, err)
 	}
-	return conf
 }
 
 var (
@@ -143,14 +138,15 @@ func (c *config) processFile(filename string, in io.Reader) error {
 	if _, err := io.Copy(&buf1, in); err != nil {
 		return err
 	}
-	t, err := parse.Reader(bytes.NewReader(buf1.Bytes()), filename, true)
+	r := bytes.NewReader(buf1.Bytes())
+	t, err := parse.Reader(r, filename, parse.IncludeNonSemantic)
 	if err != nil {
 		return err
 	}
 
 	p := format.NewPrinter(&buf2)
 	p.IndentChar = ' '
-	p.IndentSpecial = c.dotConfig.IndentSpecial
+	p.IndentSpecial = c.indentSpecial
 	if err := p.PrintTree(t); err != nil {
 		return err
 	}
