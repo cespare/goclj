@@ -262,7 +262,7 @@ var (
 		"with-redefs-fn", "with-test",
 	}
 	indentSpecialPrefixes = []string{
-		"def", "let", "send", "with",
+		"def", "let", "send", "with", "when",
 	}
 )
 

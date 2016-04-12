@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,24 +21,46 @@ func usage() {
 Any directories given will be recursively walked. If no paths are provided,
 cljfmt reads from standard input.
 
-Flags:`, os.Args[0])
+Flags:
+`, os.Args[0])
 	flag.PrintDefaults()
 }
 
+type dotConfig struct {
+	IndentSpecial []string `json:"indent-special"`
+}
+
+type config struct {
+	dotConfig *dotConfig
+	list      bool
+	write     bool
+}
+
 func main() {
-	var (
-		list  = flag.Bool("l", false, "print files whose formatting differs from cljfmt's")
-		write = flag.Bool("w", false, "write result to (source) file instead of stdout")
-	)
+	log.SetFlags(0)
+	log.SetPrefix("clfmt: ")
+	var configFile pathFlag
+	if home, ok := os.LookupEnv("HOME"); ok {
+		configFile.p = filepath.Join(home, ".cljfmt")
+	}
+	var conf config
+	flag.Var(&configFile, "c", "path to config file")
+	flag.BoolVar(&conf.list, "l", false,
+		"print files whose formatting differs from cljfmt's")
+	flag.BoolVar(&conf.write, "w", false,
+		"write result to (source) file instead of stdout")
 	flag.Usage = usage
 	flag.Parse()
 
+	conf.dotConfig = parseDotConfig(configFile)
+
 	if flag.NArg() == 0 {
-		if *write {
-			fatal("cannot use -w with standard input")
+		if conf.write {
+			log.Fatal("cannot use -w with standard input")
 		}
-		if err := processFile("<stdin>", os.Stdin, false, false); err != nil {
-			fatal(err)
+		conf.list = false
+		if err := conf.processFile("<stdin>", os.Stdin); err != nil {
+			log.Fatal(err)
 		}
 		return
 	}
@@ -44,16 +68,50 @@ func main() {
 	for _, path := range flag.Args() {
 		stat, err := os.Stat(path)
 		if err != nil {
-			fatal(err)
+			log.Fatal(err)
 		}
 		if stat.IsDir() {
-			walkDir(path, *list, *write)
+			conf.walkDir(path)
 			continue
 		}
-		if err := processFile(path, nil, *list, *write); err != nil {
-			fatal(err)
+		if err := conf.processFile(path, nil); err != nil {
+			log.Fatal(err)
 		}
 	}
+}
+
+type pathFlag struct {
+	p   string
+	set bool
+}
+
+func (pf *pathFlag) Set(v string) error {
+	pf.p = v
+	pf.set = true
+	return nil
+}
+
+func (pf *pathFlag) String() string {
+	return pf.p
+}
+
+func parseDotConfig(pf pathFlag) *dotConfig {
+	conf := new(dotConfig)
+	if pf.p == "" {
+		return conf
+	}
+	f, err := os.Open(pf.p)
+	if err != nil {
+		if !os.IsNotExist(err) || pf.set {
+			log.Println("warning: could not open config", err)
+		}
+		return conf
+	}
+	defer f.Close()
+	if err := json.NewDecoder(f).Decode(conf); err != nil {
+		log.Fatalf("cannot decode config %s: %s", pf.p, err)
+	}
+	return conf
 }
 
 var (
@@ -63,7 +121,7 @@ var (
 
 // processFile formats the given file.
 // If in == nil, the input is the file of the given name.
-func processFile(filename string, in io.Reader, list, write bool) error {
+func (c *config) processFile(filename string, in io.Reader) error {
 	var perm os.FileMode = 0644
 	if in == nil {
 		f, err := os.Open(filename)
@@ -92,27 +150,28 @@ func processFile(filename string, in io.Reader, list, write bool) error {
 
 	p := format.NewPrinter(&buf2)
 	p.IndentChar = ' '
+	p.IndentSpecial = c.dotConfig.IndentSpecial
 	if err := p.PrintTree(t); err != nil {
 		return err
 	}
 	if bytes.Equal(buf1.Bytes(), buf2.Bytes()) {
 		return nil
 	}
-	if list {
+	if c.list {
 		fmt.Println(filename)
 	}
-	if write {
+	if c.write {
 		if err := ioutil.WriteFile(filename, buf2.Bytes(), perm); err != nil {
 			return err
 		}
 	}
-	if !list && !write {
+	if !c.list && !c.write {
 		io.Copy(os.Stdout, &buf2)
 	}
 	return nil
 }
 
-func walkDir(path string, list, write bool) {
+func (c *config) walkDir(path string) {
 	walk := func(path string, f os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -125,19 +184,9 @@ func walkDir(path string, list, write bool) {
 			!strings.HasSuffix(name, ".clj") {
 			return nil
 		}
-		return processFile(path, nil, list, write)
+		return c.processFile(path, nil)
 	}
 	if err := filepath.Walk(path, walk); err != nil {
-		fatal(err)
+		log.Fatal(err)
 	}
-}
-
-func fatal(args ...interface{}) {
-	fmt.Fprintln(os.Stderr, args...)
-	os.Exit(1)
-}
-
-func fatalf(format string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, format, args...)
-	os.Exit(1)
 }
