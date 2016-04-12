@@ -36,9 +36,14 @@ func (p *Printer) alignDocstring(docstring string, w int) string {
 		indent  = strings.Repeat(string(p.IndentChar), w)
 	)
 	for _, line := range lines[1:] {
+		prefix := indent
+		n := strings.IndexFunc(line, func(r rune) bool { return r != ' ' })
+		if n > w {
+			prefix += strings.Repeat(" ", n-w)
+		}
 		line = strings.TrimSpace(line)
 		if line != "" {
-			line = indent + line
+			line = prefix + line
 		}
 		aligned = append(aligned, line)
 	}

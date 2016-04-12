@@ -1,6 +1,6 @@
 (defn foo
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-  Sed malesuada aliquam sem, vitae lacinia neque molestie ut.
+ Sed malesuada aliquam sem, vitae lacinia neque molestie ut.
 Morbi sed eleifend lectus. Morbi facilisis tincidunt felis,
 
     - foo
