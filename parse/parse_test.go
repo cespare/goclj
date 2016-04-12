@@ -23,6 +23,7 @@ var testCases = []struct {
 	{`^String`, "metadata"},
 	{"nil", "nil"},
 	{"123.456", "num(123.456)"},
+	{"foo", "sym(foo)"},
 	{"'(foobar)", "quote"},
 	{`#"^asdf"`, `regex("^asdf")`},
 	{"#{1 2 3}", "set(length=3)"},
