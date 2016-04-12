@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -46,19 +47,19 @@ func TestAll(t *testing.T) {
 	for _, tc := range testCases {
 		tree, err := Reader(strings.NewReader(tc.s), "temp", IncludeNonSemantic)
 		if err != nil {
-			t.Fatalf("Error parsing %q: %s", tc.s, err)
+			t.Fatalf("error parsing %q: %s", tc.s, err)
 		}
 		if len(tree.Roots) != 1 {
-			t.Fatalf("Got %d roots for %q; expected 1", len(tree.Roots), tc.s)
+			t.Fatalf("got %d roots for %q; want 1", len(tree.Roots), tc.s)
 		}
 		got := tree.Roots[0].String()
 		if got != tc.want {
-			t.Fatalf("For %q: got %s; want %s", tc.s, got, tc.want)
+			t.Fatalf("for %q: got %s; want %s", tc.s, got, tc.want)
 		}
 	}
 }
 
-// See issue 32.
+// Issue 32.
 func TestUnreadable(t *testing.T) {
 	_, err := Reader(strings.NewReader("#<X Y Z>"), "temp", IncludeNonSemantic)
 	if err == nil {
@@ -66,5 +67,22 @@ func TestUnreadable(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unreadable") {
 		t.Fatalf("for unreadable dispatch macro, got wrong error %s", err)
+	}
+}
+
+// Issue 33.
+func TestCommentCarriageReturn(t *testing.T) {
+	const input = "3;a\r4"
+	tree, err := Reader(strings.NewReader(input), "temp", IncludeNonSemantic)
+	if err != nil {
+		t.Fatalf("error parsing %q: %s", input, err)
+	}
+	got := make([]string, len(tree.Roots))
+	for i, node := range tree.Roots {
+		got[i] = node.String()
+	}
+	want := []string{"num(3)", `comment(";a")`, "num(4)"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("for %q, got %v; want %v", input, got, want)
 	}
 }

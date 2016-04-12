@@ -345,7 +345,7 @@ func lexWhitespace(l *lexer) stateFn {
 }
 
 func lexComment(l *lexer) stateFn {
-	l.scanUntil("\n")
+	l.scanUntil("\r\n")
 	l.emit(tokComment)
 	return lexOuter
 }
