@@ -21,3 +21,4 @@ but this is sparse, incomplete, and uses imprecise language.
   conditions (also lambdas use `%1`, `%2`, etc.) You can create your own symbol
   beginning with `%`, but `%` is not allowed anywhere but at the beginning of a
   symbol.
+* There are several undocumnented dispatch macro forms: `#^`, `#!`, `#=`, `#<`.

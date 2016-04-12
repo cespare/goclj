@@ -15,7 +15,7 @@ var testCases = []struct {
 	{"; comment!", `comment("; comment!")`},
 	{"@foo", "deref"},
 	{"#(+ % 3)", "lambda(length=3)"},
-	{"#_(a b c)", "ignore"},
+	{"#_(a b c)", "discard"},
 	{":foobar", "keyword(:foobar)"},
 	{"(foo bar baz)", "list(length=3)"},
 	{"{:a b :c d}", "map(length=2)"},
@@ -33,8 +33,13 @@ var testCases = []struct {
 	{"#'asdf", "varquote(asdf)"},
 	{"[a b c]", "vector(length=3)"},
 
-	// issue #13
-	{"#_foobar", "ignore"},
+	// issue 13
+	{"#_foobar", "discard"},
+
+	// issue 32
+	{"#=foo", "eval"},
+	{"#^foo", "metadata"},
+	{"#! hello!", `comment("#! hello!")`},
 }
 
 func TestAll(t *testing.T) {
@@ -50,5 +55,16 @@ func TestAll(t *testing.T) {
 		if got != tc.want {
 			t.Fatalf("For %q: got %s; want %s", tc.s, got, tc.want)
 		}
+	}
+}
+
+// See issue 32.
+func TestUnreadable(t *testing.T) {
+	_, err := Reader(strings.NewReader("#<X Y Z>"), "temp", IncludeNonSemantic)
+	if err == nil {
+		t.Fatal("got nil error on unreadable dispatch macro")
+	}
+	if !strings.Contains(err.Error(), "unreadable") {
+		t.Fatalf("for unreadable dispatch macro, got wrong error %s", err)
 	}
 }

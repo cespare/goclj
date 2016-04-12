@@ -163,7 +163,7 @@ func (t *Tree) parse() Node {
 		case tokLeftBrace:
 			return t.parseMap(tok)
 		case tokCircumflex:
-			return &MetadataNode{tok.pos, t.parse()}
+			return t.parseMetadata(tok)
 		case tokNewline:
 			return &NewlineNode{tok.pos}
 		case tokNumber:
@@ -301,13 +301,19 @@ func (t *Tree) parseDispatch(tok token) Node {
 	case "#(":
 		return t.parseFnLiteral(tok)
 	case "#_":
-		return t.parseIgnoreForm(tok)
+		return t.parseReaderDiscard(tok)
+	case "#=":
+		return t.parseReaderEval(tok)
 	case `#"`:
 		return t.parseRegex(tok)
 	case "#{":
 		return t.parseSet(tok)
 	case "#'":
 		return t.parseVarQuote(tok)
+	case "#^":
+		return t.parseMetadata(tok)
+	case "#!":
+	case "#<":
 	default:
 		t.unexpected(tok)
 	}
@@ -353,13 +359,31 @@ func (t *Tree) parseFnLiteral(start token) Node {
 	}
 }
 
-func (t *Tree) parseIgnoreForm(start token) Node {
+func (t *Tree) parseMetadata(start token) Node {
 	tok := t.next()
 	if tok.typ == tokEOF {
 		t.unexpectedEOF(tok)
 	}
 	t.backup()
-	return &IgnoreFormNode{start.pos, t.parse()}
+	return &MetadataNode{start.pos, t.parse()}
+}
+
+func (t *Tree) parseReaderDiscard(start token) Node {
+	tok := t.next()
+	if tok.typ == tokEOF {
+		t.unexpectedEOF(tok)
+	}
+	t.backup()
+	return &ReaderDiscardNode{start.pos, t.parse()}
+}
+
+func (t *Tree) parseReaderEval(start token) Node {
+	tok := t.next()
+	if tok.typ == tokEOF {
+		t.unexpectedEOF(tok)
+	}
+	t.backup()
+	return &ReaderEvalNode{start.pos, t.parse()}
 }
 
 func (t *Tree) parseRegex(start token) Node {

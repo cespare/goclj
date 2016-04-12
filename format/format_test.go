@@ -37,6 +37,7 @@ func TestIssue6(t *testing.T)  { testTransform(t, "issue6_before.clj", "issue6_a
 func TestIssue7(t *testing.T)  { testTransform(t, "issue7_before.clj", "issue7_after.clj") }
 func TestIssue25(t *testing.T) { testTransform(t, "issue25_before.clj", "issue25_after.clj") }
 func TestIssue26(t *testing.T) { testTransform(t, "issue26_before.clj", "issue26_after.clj") }
+func TestIssue32(t *testing.T) { testTransform(t, "issue32_before.clj", "issue32_after.clj") }
 
 func TestSpecialIndent(t *testing.T) {
 	tree := parseFile(t, "special.clj")

@@ -107,7 +107,14 @@ func (t tokType) String() string {
 
 func (t token) String() string {
 	switch t.typ {
-	case tokError, tokCharLiteral, tokComment, tokKeyword, tokNumber, tokDispatch, tokString, tokSymbol:
+	case tokError,
+		tokCharLiteral,
+		tokComment,
+		tokKeyword,
+		tokNumber,
+		tokDispatch,
+		tokString,
+		tokSymbol:
 		return fmt.Sprintf("<%s@%s>(%q)", t.typ, t.pos, t.val)
 	}
 	return fmt.Sprintf("<%s@%s>", t.typ, t.pos)
@@ -382,18 +389,22 @@ func lexKeyword(l *lexer) stateFn {
 }
 
 func lexDispatch(l *lexer) stateFn {
-	// Dispatch is tricky. '#foo" and '# foo' are both interpeted as the tag 'foo'.
-	// However, '# _' is not interpreted as the ignore macro -- it is the tag '_'.
+	// Dispatch is tricky. '#foo" and '# foo' are both interpeted as the tag
+	// 'foo'. However, '# _' is not interpreted as the ignore macro -- it is
+	// the tag '_'.
 	// (So the whitespace matters when tokenizing a dispatch macro.)
 	// Here's how we navigate this:
 	//
-	// If it's a tag, we'll emit an octothorpe token and move on (the subsequent symbol is the tag value).
+	// If it's a tag, we'll emit an octothorpe token and move on
+	// (the subsequent symbol is the tag value).
 	//
-	// If it's a paired delimiter dispatch form -- #{...}, #(...), or #"..." -- the dispatch token we emit
-	// will have two chars. The second char will be repeated in the following token.
-	// (for instance, "#{1}" will be tokenized as "#{", "{", "1", "}".
+	// If it's a paired delimiter dispatch form -- #{...}, #(...), or #"..."
+	// -- the dispatch token we emit will have two chars. The second char
+	// will be repeated in the following token. (for instance, "#{1}" will
+	// be tokenized as "#{", "{", "1", "}".
 	//
-	// Otherwise, the dispatch token is two chars and the following token is distinct.
+	// Otherwise, the dispatch token is two chars and the following token is
+	// distinct.
 	r, eof := l.next()
 	if eof {
 		l.emit(tokOctothorpe)
@@ -406,10 +417,16 @@ func lexDispatch(l *lexer) stateFn {
 		l.skip()
 		l.synth(tokDispatch, val)
 		return lexOuter
-	case '\'', '_':
+	case '\'', '_', '^', '=':
 		l.skip()
 		l.synth(tokDispatch, val)
 		return lexOuter
+	case '!':
+		// #! is a reader dispatch macro for comments.
+		return lexComment
+	case '<':
+		// #< is the 'unreadable' reader dispatch macro.
+		l.errorf("unreadable dispatch macro")
 	default:
 		l.back()
 		l.skip()

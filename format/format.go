@@ -88,8 +88,11 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		w += p.WriteString("#(")
 		w = p.printSequence(node.Nodes, w, p.chooseIndent(node.Nodes))
 		return w + p.WriteString(")")
-	case *parse.IgnoreFormNode:
+	case *parse.ReaderDiscardNode:
 		w += p.WriteString("#_")
+		return p.printNode(node.Node, w)
+	case *parse.ReaderEvalNode:
+		w += p.WriteString("#=")
 		return p.printNode(node.Node, w)
 	case *parse.KeywordNode:
 		return w + p.WriteString(node.Val)

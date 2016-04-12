@@ -8,7 +8,7 @@ CharacterNode
 CommentNode
 DerefNode
 FnLiteralNode
-IgnoreFormNode
+ReaderDiscardNode
 KeywordNode
 ListNode
 MapNode
@@ -253,16 +253,30 @@ func (n *FnLiteralNode) String() string {
 func (n *FnLiteralNode) Children() []Node         { return n.Nodes }
 func (n *FnLiteralNode) SetChildren(nodes []Node) { n.Nodes = nodes }
 
-type IgnoreFormNode struct {
+type ReaderDiscardNode struct {
 	*Pos
 	Node Node
 }
 
-func (n *IgnoreFormNode) String() string   { return "ignore" }
-func (n *IgnoreFormNode) Children() []Node { return []Node{n.Node} }
-func (n *IgnoreFormNode) SetChildren(nodes []Node) {
+func (n *ReaderDiscardNode) String() string   { return "discard" }
+func (n *ReaderDiscardNode) Children() []Node { return []Node{n.Node} }
+func (n *ReaderDiscardNode) SetChildren(nodes []Node) {
 	if len(nodes) != 1 {
-		panicf("SetChildren called on IgnoreFormNode with %d nodes", len(nodes))
+		panicf("SetChildren called on ReaderDiscardNode with %d nodes", len(nodes))
+	}
+	n.Node = nodes[0]
+}
+
+type ReaderEvalNode struct {
+	*Pos
+	Node Node
+}
+
+func (n *ReaderEvalNode) String() string   { return "eval" }
+func (n *ReaderEvalNode) Children() []Node { return []Node{n.Node} }
+func (n *ReaderEvalNode) SetChildren(nodes []Node) {
+	if len(nodes) != 1 {
+		panicf("SetChildren called on ReaderEvalNode with %d nodes", len(nodes))
 	}
 	n.Node = nodes[0]
 }
