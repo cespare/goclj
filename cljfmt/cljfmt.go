@@ -48,7 +48,6 @@ func main() {
 	flag.Parse()
 
 	conf.parseDotConfig(configFile)
-	fmt.Println(conf.indentSpecial)
 
 	if flag.NArg() == 0 {
 		if conf.write {
