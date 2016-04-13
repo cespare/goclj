@@ -149,15 +149,14 @@ func (c *config) processFile(filename string, in io.Reader) error {
 	if err := p.PrintTree(t); err != nil {
 		return err
 	}
-	if bytes.Equal(buf1.Bytes(), buf2.Bytes()) {
-		return nil
-	}
-	if c.list {
-		fmt.Println(filename)
-	}
-	if c.write {
-		if err := ioutil.WriteFile(filename, buf2.Bytes(), perm); err != nil {
-			return err
+	if !bytes.Equal(buf1.Bytes(), buf2.Bytes()) {
+		if c.list {
+			fmt.Println(filename)
+		}
+		if c.write {
+			if err := ioutil.WriteFile(filename, buf2.Bytes(), perm); err != nil {
+				return err
+			}
 		}
 	}
 	if !c.list && !c.write {
