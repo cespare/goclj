@@ -26,9 +26,9 @@ Flags:
 }
 
 type config struct {
-	indentSpecial []string
-	list          bool
-	write         bool
+	indentOverrides map[string]format.IndentStyle
+	list            bool
+	write           bool
 }
 
 func main() {
@@ -102,7 +102,7 @@ func (c *config) parseDotConfig(pf pathFlag) {
 		return
 	}
 	defer f.Close()
-	c.indentSpecial, err = parseDotConfig(f, pf.p)
+	c.indentOverrides, err = parseDotConfig(f, pf.p)
 	if err != nil {
 		log.Fatalf("error parsing config %s: %s", pf.p, err)
 	}
@@ -145,7 +145,7 @@ func (c *config) processFile(filename string, in io.Reader) error {
 
 	p := format.NewPrinter(&buf2)
 	p.IndentChar = ' '
-	p.IndentSpecial = c.indentSpecial
+	p.IndentOverrides = c.indentOverrides
 	if err := p.PrintTree(t); err != nil {
 		return err
 	}

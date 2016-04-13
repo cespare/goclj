@@ -15,6 +15,8 @@ import (
 
 func TestSimpleFile(t *testing.T) { testFixture(t, "simple1.clj") }
 func TestLet(t *testing.T)        { testFixture(t, "let.clj") }
+func TestDeftype(t *testing.T)    { testFixture(t, "deftype.clj") }
+func TestListbody(t *testing.T)   { testFixture(t, "listbody.clj") }
 
 func TestStyleGuide(t *testing.T) { testTransform(t, "styleguide_bad.clj", "styleguide_good.clj") }
 func TestNewline(t *testing.T)    { testTransform(t, "newline_before.clj", "newline_after.clj") }
@@ -39,23 +41,28 @@ func TestIssue25(t *testing.T) { testTransform(t, "issue25_before.clj", "issue25
 func TestIssue26(t *testing.T) { testTransform(t, "issue26_before.clj", "issue26_after.clj") }
 func TestIssue32(t *testing.T) { testTransform(t, "issue32_before.clj", "issue32_after.clj") }
 
-func TestSpecialIndent(t *testing.T) {
-	tree := parseFile(t, "special.clj")
+func TestCustomIndent(t *testing.T) {
+	const file0 = "indent1.clj"
+	const file1 = "indent1_custom.clj"
+	tree := parseFile(t, file0)
 	var buf bytes.Buffer
 	if err := NewPrinter(&buf).PrintTree(tree); err != nil {
 		t.Fatal(err)
 	}
-	want := readFile(t, "special.clj")
-	check(t, "special.clj", buf.Bytes(), want)
+	want := readFile(t, file0)
+	check(t, file0, buf.Bytes(), want)
 
 	buf.Reset()
 	p := NewPrinter(&buf)
-	p.IndentSpecial = []string{"delete", "up"}
+	p.IndentOverrides = map[string]IndentStyle{
+		"delete": IndentListBody,
+		"up":     IndentListBody,
+	}
 	if err := p.PrintTree(tree); err != nil {
 		t.Fatal(err)
 	}
-	want = readFile(t, "special_custom.clj")
-	check(t, "special.clj (with custom IndentSpecial)", buf.Bytes(), want)
+	want = readFile(t, file1)
+	check(t, file1, buf.Bytes(), want)
 }
 
 func testFixture(t *testing.T, filename string) {

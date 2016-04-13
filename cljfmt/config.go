@@ -1,9 +1,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
+	"github.com/cespare/goclj/format"
 	"github.com/cespare/goclj/parse"
 )
 
@@ -16,7 +18,7 @@ func (e unexpectedNodeError) Error() string {
 		e.Node, e.Node.Position())
 }
 
-func parseDotConfig(r io.Reader, name string) (indentSpecial []string, err error) {
+func parseDotConfig(r io.Reader, name string) (map[string]format.IndentStyle, error) {
 	// We don't ask the parser for non-semantic nodes, so we don't need to
 	// prune out comments.
 	tree, err := parse.Reader(r, name, 0)
@@ -40,29 +42,80 @@ func parseDotConfig(r io.Reader, name string) (indentSpecial []string, err error
 	for i := 0; i < len(m.Nodes); i += 2 {
 		k := m.Nodes[i]
 		sym, ok := k.(*parse.KeywordNode)
-		if !ok || sym.Val != ":indent-special" {
+		if !ok || sym.Val != ":indent-overrides" {
 			continue
 		}
-		indentSpecial, err = parseStringVector(m.Nodes[i+1])
+		seq, err := sequence(m.Nodes[i+1])
 		if err != nil {
 			return nil, err
 		}
+		return parseIndentOverrides(seq)
 	}
-	return indentSpecial, nil
+	return nil, nil
 }
 
-func parseStringVector(node parse.Node) ([]string, error) {
-	vec, ok := node.(*parse.VectorNode)
-	if !ok {
-		return nil, unexpectedNodeError{node}
+func parseIndentOverrides(nodes []parse.Node) (map[string]format.IndentStyle, error) {
+	if len(nodes)%2 != 0 {
+		return nil, errors.New(":indent-overrides value has odd number of children")
 	}
-	ss := make([]string, len(vec.Nodes))
-	for i, v := range vec.Nodes {
-		s, ok := v.(*parse.StringNode)
-		if !ok {
-			return nil, unexpectedNodeError{v}
+	overrides := make(map[string]format.IndentStyle)
+	for i := 0; i < len(nodes); i += 2 {
+		var names []string
+		seq, err := sequence(nodes[i])
+		if err == nil {
+			for _, n := range seq {
+				s, err := stringNode(n)
+				if err != nil {
+					return nil, err
+				}
+				names = append(names, s)
+			}
+		} else {
+			s, err := stringNode(nodes[i])
+			if err != nil {
+				return nil, err
+			}
+			names = []string{s}
 		}
-		ss[i] = s.Val
+		kw, ok := nodes[i+1].(*parse.KeywordNode)
+		if !ok {
+			return nil, unexpectedNodeError{nodes[i+1]}
+		}
+		style, ok := indentStyles[kw.Val]
+		if !ok {
+			return nil, fmt.Errorf("unknown indent style %q", kw.Val)
+		}
+		for _, name := range names {
+			overrides[name] = style
+		}
 	}
-	return ss, nil
+	return overrides, nil
+}
+
+func sequence(node parse.Node) ([]parse.Node, error) {
+	switch node.(type) {
+	case *parse.ListNode, *parse.VectorNode:
+		return node.Children(), nil
+	}
+	return nil, unexpectedNodeError{node}
+}
+
+func stringNode(node parse.Node) (string, error) {
+	sn, ok := node.(*parse.StringNode)
+	if !ok {
+		return "", unexpectedNodeError{node}
+	}
+	return sn.Val, nil
+}
+
+var indentStyles = map[string]format.IndentStyle{
+	":normal":    format.IndentNormal,
+	":list":      format.IndentList,
+	":list-body": format.IndentListBody,
+	":let":       format.IndentLet,
+	":letfn":     format.IndentLetfn,
+	":deftype":   format.IndentDeftype,
+	":cond0":     format.IndentCond0,
+	":cond1":     format.IndentCond1,
+	":cond2":     format.IndentCond2,
 }

@@ -16,16 +16,13 @@ type Printer struct {
 	// IndentChar is the character used for indentation
 	// (by default, ' ' is used).
 	IndentChar rune
-	// IndentSpecial are extra names that are given two-space indentation
-	// regardless of length (the same way that defn, let, with* and many
-	// others are).
-	IndentSpecial []string
+	// IndentOverrides allow setting specific indentation styles for forms.
+	IndentOverrides map[string]IndentStyle
 
-	// indentSpecialSet is the union of indentSpecialDefaults and
-	// IndentSpecial.
-	indentSpecialSet map[string]struct{}
-	specialIndent    map[parse.Node]indentStyle
-	docstrings       map[*parse.StringNode]struct{}
+	// indentStyles is the union of defaultIndents and IndentOverrides.
+	indentStyles  map[string]IndentStyle
+	specialIndent map[parse.Node]IndentStyle
+	docstrings    map[*parse.StringNode]struct{}
 }
 
 // NewPrinter creates a printer to the given writer.
@@ -33,19 +30,19 @@ func NewPrinter(w io.Writer) *Printer {
 	return &Printer{
 		bufWriter:     &bufWriter{bufio.NewWriter(w)},
 		IndentChar:    ' ',
-		specialIndent: make(map[parse.Node]indentStyle),
+		specialIndent: make(map[parse.Node]IndentStyle),
 		docstrings:    make(map[*parse.StringNode]struct{}),
 	}
 }
 
 // PrintTree writes t to p's writer.
 func (p *Printer) PrintTree(t *parse.Tree) (err error) {
-	p.indentSpecialSet = make(map[string]struct{})
-	for _, s := range indentSpecialDefaults {
-		p.indentSpecialSet[s] = struct{}{}
+	p.indentStyles = make(map[string]IndentStyle)
+	for k, v := range defaultIndents {
+		p.indentStyles[k] = v
 	}
-	for _, s := range p.IndentSpecial {
-		p.indentSpecialSet[s] = struct{}{}
+	for k, v := range p.IndentOverrides {
+		p.indentStyles[k] = v
 	}
 	defer func() {
 		if e := recover(); e != nil {
@@ -63,7 +60,7 @@ func (p *Printer) PrintTree(t *parse.Tree) (err error) {
 	for _, node := range t.Roots {
 		p.markDocstrings(node)
 	}
-	p.printSequence(t.Roots, 0, indentNormal)
+	p.printSequence(t.Roots, 0, IndentNormal)
 	return p.bw.Flush()
 }
 
@@ -98,7 +95,7 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		return w + p.WriteString(node.Val)
 	case *parse.ListNode:
 		p.applySpecialIndentRules(node)
-		var style indentStyle
+		var style IndentStyle
 		var ok bool
 		if style, ok = p.specialIndent[node]; ok {
 			delete(p.specialIndent, node)
@@ -110,7 +107,7 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		return w + p.WriteString(")")
 	case *parse.MapNode:
 		w += p.WriteString("{")
-		w = p.printSequence(node.Nodes, w, indentNormal)
+		w = p.printSequence(node.Nodes, w, IndentNormal)
 		return w + p.WriteString("}")
 	case *parse.MetadataNode:
 		w += p.WriteByte('^')
@@ -128,7 +125,7 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		return w + p.WriteString(`#"`+node.Val+`"`)
 	case *parse.SetNode:
 		w += p.WriteString("#{")
-		w = p.printSequence(node.Nodes, w, indentNormal)
+		w = p.printSequence(node.Nodes, w, IndentNormal)
 		return w + p.WriteString("}")
 	case *parse.StringNode:
 		val := node.Val
@@ -157,7 +154,7 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		if ok {
 			delete(p.specialIndent, node)
 		} else {
-			style = indentNormal
+			style = IndentNormal
 		}
 		w += p.WriteString("[")
 		w = p.printSequence(node.Nodes, w, style)
@@ -179,13 +176,15 @@ func (p *Printer) applySpecialIndentRules(node *parse.ListNode) {
 	if !ok {
 		return
 	}
-	switch symbolName(s.Val) {
-	case "let":
-		p.applySpecialLet(node.Nodes)
-	case "letfn":
-		p.applySpecialLetfn(node.Nodes)
-	case "deftype", "defrecord":
-		p.applySpecialDeftype(node.Nodes)
+	if style, ok := p.indentStyles[symbolName(s.Val)]; ok {
+		switch style {
+		case IndentLet:
+			p.applySpecialLet(node.Nodes)
+		case IndentLetfn:
+			p.applySpecialLetfn(node.Nodes)
+		case IndentDeftype:
+			p.applySpecialDeftype(node.Nodes)
+		}
 	}
 }
 
@@ -195,7 +194,7 @@ func (p *Printer) applySpecialLet(nodes []parse.Node) {
 			continue
 		}
 		if v, ok := node.(*parse.VectorNode); ok {
-			p.specialIndent[v] = indentLet
+			p.specialIndent[v] = indentBindings
 		}
 		return
 	}
@@ -212,7 +211,7 @@ func (p *Printer) applySpecialLetfn(nodes []parse.Node) {
 		}
 		for _, n := range v.Nodes {
 			if fn, ok := n.(*parse.ListNode); ok {
-				p.specialIndent[fn] = indentListSpecial
+				p.specialIndent[fn] = IndentListBody
 			}
 		}
 	}
@@ -221,65 +220,97 @@ func (p *Printer) applySpecialLetfn(nodes []parse.Node) {
 func (p *Printer) applySpecialDeftype(nodes []parse.Node) {
 	for _, node := range nodes[1:] {
 		if fn, ok := node.(*parse.ListNode); ok {
-			p.specialIndent[fn] = indentListSpecial
+			p.specialIndent[fn] = IndentListBody
 		}
 	}
 }
 
-func (p *Printer) chooseIndent(nodes []parse.Node) indentStyle {
+func (p *Printer) chooseIndent(nodes []parse.Node) IndentStyle {
 	if len(nodes) == 0 {
-		return indentNormal
+		return IndentNormal
 	}
 	switch node := nodes[0].(type) {
 	case *parse.KeywordNode:
-		return indentList
+		return IndentList
 	case *parse.SymbolNode:
-		switch node.Val {
-		case "cond":
-			return indentCond
-		case "case", "cond->", "cond->>":
-			return indentCond2
-		case "condp":
-			return indentCondp
-		}
-		if p.special(node) {
-			return indentListSpecial
-		}
-		return indentList
+		return p.chooseListIndent(node.Val)
 	}
-	return indentNormal
+	return IndentNormal
 }
 
-var (
-	// TODO(caleb): I wish I had written down where I got this list...
-	indentSpecialDefaults = []string{
-		"as->", "binding", "bound-fn", "case", "catch", "cond->", "cond->>",
-		"condp", "def", "definline", "definterface", "defmacro", "defmethod",
-		"defmulti", "defn", "defn-", "defonce", "defprotocol", "defrecord",
-		"defstruct", "deftest", "deftest-", "deftype", "doseq", "dotimes", "doto",
-		"extend", "extend-protocol", "extend-type", "fn", "for", "if", "if-let",
-		"if-not", "if-some", "let", "letfn", "locking", "loop", "ns", "proxy",
-		"reify", "set-test", "testing", "when", "when-first", "when-let",
-		"when-not", "when-some", "while", "with-bindings", "with-in-str",
-		"with-local-vars", "with-open", "with-precision", "with-redefs",
-		"with-redefs-fn", "with-test",
+func (p *Printer) chooseListIndent(name string) IndentStyle {
+	name = symbolName(name)
+	if style, ok := p.indentStyles[name]; ok {
+		return style
 	}
-	indentSpecialPrefixes = []string{
-		"def", "let", "send", "with", "when",
-	}
-)
-
-func (p *Printer) special(node *parse.SymbolNode) bool {
-	name := symbolName(node.Val)
-	if _, ok := p.indentSpecialSet[name]; ok {
-		return true
-	}
-	for _, prefix := range indentSpecialPrefixes {
+	for _, prefix := range []string{"def", "let", "send-", "with-", "when-"} {
 		if strings.HasPrefix(name, prefix) {
-			return true
+			return IndentListBody
 		}
 	}
-	return false
+	return IndentList
+}
+
+var defaultIndents = map[string]IndentStyle{
+	"as->":            IndentListBody,
+	"binding":         IndentLet,
+	"bound-fn":        IndentListBody,
+	"case":            IndentCond1,
+	"catch":           IndentListBody,
+	"cond":            IndentCond0,
+	"cond->":          IndentCond1,
+	"cond->>":         IndentCond1,
+	"condp":           IndentCond2,
+	"def":             IndentListBody,
+	"definline":       IndentListBody,
+	"definterface":    IndentDeftype,
+	"defmacro":        IndentListBody,
+	"defmethod":       IndentListBody,
+	"defmulti":        IndentListBody,
+	"defn":            IndentListBody,
+	"defn-":           IndentListBody,
+	"defonce":         IndentListBody,
+	"defprotocol":     IndentDeftype,
+	"defrecord":       IndentDeftype,
+	"defstruct":       IndentListBody,
+	"deftest":         IndentListBody,
+	"deftest-":        IndentListBody,
+	"deftype":         IndentDeftype,
+	"doseq":           IndentListBody,
+	"dotimes":         IndentLet,
+	"doto":            IndentListBody,
+	"extend":          IndentListBody,
+	"extend-protocol": IndentDeftype,
+	"extend-type":     IndentDeftype,
+	"fn":              IndentListBody,
+	"for":             IndentListBody,
+	"if":              IndentListBody,
+	"if-let":          IndentLet,
+	"if-not":          IndentListBody,
+	"if-some":         IndentLet,
+	"let":             IndentLet,
+	"letfn":           IndentLetfn,
+	"locking":         IndentListBody,
+	"loop":            IndentLet,
+	"ns":              IndentListBody,
+	"proxy":           IndentDeftype,
+	"reify":           IndentDeftype,
+	"set-test":        IndentListBody,
+	"testing":         IndentListBody,
+	"when":            IndentListBody,
+	"when-first":      IndentLet,
+	"when-let":        IndentLet,
+	"when-not":        IndentListBody,
+	"when-some":       IndentLet,
+	"while":           IndentListBody,
+	"with-bindings":   IndentListBody,
+	"with-in-str":     IndentListBody,
+	"with-local-vars": IndentLet,
+	"with-open":       IndentLet,
+	"with-precision":  IndentListBody,
+	"with-redefs":     IndentLet,
+	"with-redefs-fn":  IndentListBody,
+	"with-test":       IndentListBody,
 }
 
 func symbolName(sym string) string {
@@ -289,26 +320,93 @@ func symbolName(sym string) string {
 	return sym
 }
 
-type indentStyle int
+// An IndentStyle represents the indentation strategy
+// used for formatting a sequence of values.
+type IndentStyle int
 
 const (
-	indentNormal      indentStyle = iota // [1\n2] ; 2 is below 1
-	indentList                           // (foo bar\nbaz) ; baz is below bar
-	indentListSpecial                    // (defn foo []\nbar) ; bar is indented 2
-	indentLet                            // (let [foo\nbar]) ; bar is indented two beyond foo
-	indentCond                           // like indentLet but starting on the second element
-	indentCond2                          // like indentLet but starting on the third element
-	indentCondp                          // like indentLet but starting on the fourth element
+	// IndentNormal is for sequences that introduce no special indentation.
+	//   [1
+	//    2]
+	IndentNormal IndentStyle = iota
+	// IndentList is the default list indentation.
+	//   (foo bar
+	//        baz)
+	IndentList
+	// IndentListBody is for list forms which have bodies. For these forms,
+	// subsequent lines are indented two spaces, rather than being aligned.
+	// Forms like this include many language functions and macros like def
+	// and defn.
+	//   (def x
+	//     3)
+	//   (defn foo []
+	//     bar)
+	IndentListBody
+	// IndentLet is for let-like forms. This is like IndentListBody, except
+	// that the first parameter consists of let-style bindings (the
+	// even-numbered ones are indented).
+	//   (let [foo
+	//           bar])
+	IndentLet
+	// indentBindings is for the paired bindings (usually inside a vector
+	// form) of a form indented using IndentLet.
+	indentBindings
+	// IndentLetfn is for letfn or anything that looks like it, where the
+	// binding vector contains function bodies that should be themselves
+	// indented using IndentListBody.
+	//   (letfn [(twice [x]
+	//              (* x 2))
+	//           (six-times [y]
+	//              (* (twice y) 3))]
+	//     (println "Twice 15 =" (twice 15))
+	//     (println "Six times 15 =" (six-times 15)))
+	IndentLetfn
+	// IndentDeftype is used for macros similar to deftype that define
+	// functions/methods that themselves should be indented using
+	// IndentListBody.
+	//   (defrecord Foo [x y z]
+	//     Xer
+	//     (foobar [this]
+	//       this)
+	//     (baz [this a b c]
+	//       (+ a b c)))
+	IndentDeftype
+	// IndentCond0 is like IndentListBody but the even-numbered arguments
+	// are further indented by two.
+	//   (cond
+	//     (> a 10)
+	//       foo
+	//     (> a 5)
+	//       bar)
+	IndentCond0
+	// IndentCond1 is like IndentCond0 except that it ignores 1 body
+	// parameter.
+	//   (case x
+	//     "one"
+	//       1
+	//     "two"
+	//       2)
+	IndentCond1
+	// IndentCond2 is like IndentCond0 except that it ignores 2 body
+	// parameters.
+	//   (condp = value
+	//     1
+	//       "one"
+	//     2
+	//       "two"
+	//     3
+	//       "three")
+	IndentCond2
 )
 
 var indentExtraOffsets = [...]int{
-	indentLet:   0,
-	indentCond:  1,
-	indentCond2: 2,
-	indentCondp: 3,
+	indentBindings: 0,
+	IndentCond0:    1,
+	IndentCond1:    2,
+	IndentCond2:    3,
 }
 
-func (p *Printer) printSequence(nodes []parse.Node, w int, style indentStyle) int {
+func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) int {
 	var (
 		w2         = w
 		needSpace  = false
@@ -317,7 +415,7 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style indentStyle) in
 		// used for IndentList, for tracking indent based on nodes[0]
 		firstIndent int
 
-		// used by IndentLet, indexCond, indexCase, and indexCondp
+		// used by indentBindings, indexCond, indexCase, and indexCondp
 		// for counting semantic tokens
 		idxSemantic int
 		extraIndent = false
@@ -325,19 +423,26 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style indentStyle) in
 	for i, n := range nodes {
 		if goclj.Newline(n) {
 			switch style {
-			case indentList, indentListSpecial:
+			case IndentList,
+				IndentListBody,
+				IndentLet,
+				IndentLetfn,
+				IndentDeftype:
 				if i == 1 {
 					w++
 				}
-			case indentLet, indentCond, indentCond2, indentCondp:
+			case indentBindings,
+				IndentCond0,
+				IndentCond1,
+				IndentCond2:
 				off := indentExtraOffsets[style]
 				if idxSemantic >= 1 && idxSemantic <= off {
-					// Fall back to indentListSpecial in this case.
+					// Fall back to IndentListBody in this case.
 					// Example:
 					// (case
 					//    foo
 					//    "a" b)
-					// The 'foo' is indented like indentListSpecial.
+					// The 'foo' is indented like IndentListBody.
 					if i == 1 {
 						w++
 					}
@@ -357,11 +462,12 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style indentStyle) in
 			idxSemantic++
 		}
 		switch style {
-		case indentList:
+		case IndentList:
 			if i == 1 {
 				w = firstIndent + 1
 			}
-		case indentListSpecial, indentCond, indentCond2, indentCondp:
+		case IndentNormal, indentBindings:
+		default:
 			if i == 1 {
 				w++
 			}
