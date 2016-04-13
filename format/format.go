@@ -107,7 +107,7 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		return w + p.WriteString(")")
 	case *parse.MapNode:
 		w += p.WriteString("{")
-		w = p.printSequence(node.Nodes, w, IndentNormal)
+		w = p.printSequence(node.Nodes, w, indentBindings)
 		return w + p.WriteString("}")
 	case *parse.MetadataNode:
 		w += p.WriteByte('^')
@@ -349,7 +349,7 @@ const (
 	//           bar])
 	IndentLet
 	// indentBindings is for the paired bindings (usually inside a vector
-	// form) of a form indented using IndentLet.
+	// form) of a form indented using IndentLet. It is also used for maps.
 	indentBindings
 	// IndentLetfn is for letfn or anything that looks like it, where the
 	// binding vector contains function bodies that should be themselves
