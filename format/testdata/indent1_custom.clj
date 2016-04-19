@@ -4,5 +4,5 @@
       (send-foo 1
         (with-bar 2
           (delete 3
-            (up 4
+            (x/up 4
               blah)))))))
