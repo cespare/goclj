@@ -76,7 +76,7 @@ func (p *Printer) PrintTree(t *parse.Tree) (err error) {
 		p.markDocstrings(node)
 		p.markThreadFirsts(node)
 	}
-	p.printSequence(t.Roots, 0, IndentNormal, false)
+	p.printSequence(t.Roots, 0, IndentNormal)
 	return p.bw.Flush()
 }
 
@@ -99,7 +99,7 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		return p.printNode(node.Node, w)
 	case *parse.FnLiteralNode:
 		w += p.WriteString("#(")
-		w = p.printSequence(node.Nodes, w, p.chooseIndent(node.Nodes), false)
+		w = p.printSequence(node.Nodes, w, p.chooseIndent(node.Nodes))
 		return w + p.WriteString(")")
 	case *parse.ReaderDiscardNode:
 		w += p.WriteString("#_")
@@ -118,13 +118,15 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		} else {
 			style = p.chooseIndent(node.Nodes)
 		}
+		if _, ok := p.threadFirst[node]; ok {
+			style = style.threadFirstTransform()
+		}
 		w += p.WriteString("(")
-		_, threadFirst := p.threadFirst[node]
-		w = p.printSequence(node.Nodes, w, style, threadFirst)
+		w = p.printSequence(node.Nodes, w, style)
 		return w + p.WriteString(")")
 	case *parse.MapNode:
 		w += p.WriteString("{")
-		w = p.printSequence(node.Nodes, w, indentBindings, false)
+		w = p.printSequence(node.Nodes, w, indentBindings)
 		return w + p.WriteString("}")
 	case *parse.MetadataNode:
 		w += p.WriteByte('^')
@@ -142,7 +144,7 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		return w + p.WriteString(`#"`+node.Val+`"`)
 	case *parse.SetNode:
 		w += p.WriteString("#{")
-		w = p.printSequence(node.Nodes, w, IndentNormal, false)
+		w = p.printSequence(node.Nodes, w, IndentNormal)
 		return w + p.WriteString("}")
 	case *parse.StringNode:
 		val := node.Val
@@ -174,7 +176,7 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 			style = IndentNormal
 		}
 		w += p.WriteString("[")
-		w = p.printSequence(node.Nodes, w, style, false)
+		w = p.printSequence(node.Nodes, w, style)
 		return w + p.WriteString("]")
 	default:
 		fmtErrf("%s: unhandled node type %T", node.Position(), node)
@@ -447,7 +449,17 @@ var indentExtraOffsets = [...]int{
 	IndentCond4:    5,
 }
 
-func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle, threadFirst bool) int {
+func (style IndentStyle) threadFirstTransform() IndentStyle {
+	switch style {
+	case IndentCond1:
+		return IndentCond0
+	case IndentCond2:
+		return IndentCond1
+	}
+	return style
+}
+
+func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) int {
 	var (
 		w2         = w
 		needSpace  = false
@@ -478,9 +490,6 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle, th
 				IndentCond2,
 				IndentCond4:
 				off := indentExtraOffsets[style]
-				if threadFirst {
-					off--
-				}
 				if idxSemantic >= 1 && idxSemantic <= off {
 					// Fall back to IndentListBody in this case.
 					// Example:
