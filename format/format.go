@@ -460,14 +460,30 @@ func (style IndentStyle) threadFirstTransform() IndentStyle {
 	return style
 }
 
+// indentListMaxCommentAlign is the maximum length of a list form name that will
+// still cause the arguments to be aligned using IndentList default style if the
+// element with which they're being aligned with is a comment.
+// For example:
+// (foobar ; len(foobar) < indentListMaxCommentAlign
+//         1
+//         2)
+//
+// but
+// (foobar-blah-blah-blah ; len(foobar-blah-blah-blah) > indentListMaxCommentAlign
+//   1
+//   2)
+const indentListMaxCommentAlign = 12
+
 func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) int {
 	var (
 		w2         = w
 		needSpace  = false
 		needIndent = false
 
-		// used for IndentList, for tracking indent based on nodes[0]
+		// used for IndentList and IndentCond0,
+		// for tracking indent based on nodes[0]
 		firstIndent int
+		firstLen    int
 
 		// used by indentBindings, indexCond, indexCase, and indexCondp
 		// for counting semantic tokens
@@ -513,13 +529,18 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) in
 			needSpace = false
 			continue
 		}
-		if goclj.Semantic(n) {
+		semantic := goclj.Semantic(n)
+		if semantic {
 			idxSemantic++
 		}
 		switch style {
 		case IndentList, IndentCond0:
 			if i == 1 {
-				w = firstIndent + 1
+				if !semantic && firstLen > indentListMaxCommentAlign {
+					w++
+				} else {
+					w = firstIndent + 1
+				}
 			}
 		case IndentNormal, indentBindings:
 		default:
@@ -536,6 +557,7 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) in
 		w2 = p.printNode(n, w2)
 		if i == 0 {
 			firstIndent = w2
+			firstLen = w2 - w
 		}
 		needIndent = false
 		needSpace = true

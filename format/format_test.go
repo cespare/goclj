@@ -67,6 +67,21 @@ func TestCustomIndent(t *testing.T) {
 	check(t, file1, buf.Bytes(), want)
 }
 
+func TestIssue41(t *testing.T) {
+	const file = "issue41.clj"
+	tree := parseFile(t, file)
+	var buf bytes.Buffer
+	p := NewPrinter(&buf)
+	p.IndentOverrides = map[string]IndentStyle{
+		"cond-blah-blah-blah": IndentCond0,
+	}
+	if err := p.PrintTree(tree); err != nil {
+		t.Fatal(err)
+	}
+	want := readFile(t, file)
+	check(t, file, buf.Bytes(), want)
+}
+
 func testFixture(t *testing.T, filename string) {
 	testTransform(t, filename, filename)
 }
