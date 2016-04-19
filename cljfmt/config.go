@@ -139,6 +139,7 @@ var indentStyles = map[string]format.IndentStyle{
 	":cond0":     format.IndentCond0,
 	":cond1":     format.IndentCond1,
 	":cond2":     format.IndentCond2,
+	":cond4":     format.IndentCond4,
 }
 
 var threadFirstStyles = map[string]format.ThreadFirstStyle{

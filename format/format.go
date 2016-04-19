@@ -371,6 +371,9 @@ const (
 	//     3
 	//       "three")
 	IndentCond2
+	// IndentCond4 is like IndentCond0 except that it ignores 4 body
+	// parameters.
+	IndentCond4
 )
 
 var defaultIndents = map[string]IndentStyle{
@@ -441,6 +444,7 @@ var indentExtraOffsets = [...]int{
 	IndentCond0:    1,
 	IndentCond1:    2,
 	IndentCond2:    3,
+	IndentCond4:    5,
 }
 
 func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle, threadFirst bool) int {
@@ -471,7 +475,8 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle, th
 			case indentBindings,
 				IndentCond0,
 				IndentCond1,
-				IndentCond2:
+				IndentCond2,
+				IndentCond4:
 				off := indentExtraOffsets[style]
 				if threadFirst {
 					off--
