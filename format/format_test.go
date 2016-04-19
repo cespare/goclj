@@ -13,10 +13,11 @@ import (
 
 // TODO: Rewrite using subtests after Go 1.7.
 
-func TestSimpleFile(t *testing.T) { testFixture(t, "simple1.clj") }
-func TestLet(t *testing.T)        { testFixture(t, "let.clj") }
-func TestDeftype(t *testing.T)    { testFixture(t, "deftype.clj") }
-func TestListbody(t *testing.T)   { testFixture(t, "listbody.clj") }
+func TestSimpleFile(t *testing.T)  { testFixture(t, "simple1.clj") }
+func TestLet(t *testing.T)         { testFixture(t, "let.clj") }
+func TestDeftype(t *testing.T)     { testFixture(t, "deftype.clj") }
+func TestListbody(t *testing.T)    { testFixture(t, "listbody.clj") }
+func TestThreadFirst(t *testing.T) { testFixture(t, "threadfirst.clj") }
 
 func TestStyleGuide(t *testing.T) { testTransform(t, "styleguide_bad.clj", "styleguide_good.clj") }
 func TestNewline(t *testing.T)    { testTransform(t, "newline_before.clj", "newline_after.clj") }

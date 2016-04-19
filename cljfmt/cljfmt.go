@@ -26,9 +26,10 @@ Flags:
 }
 
 type config struct {
-	indentOverrides map[string]format.IndentStyle
-	list            bool
-	write           bool
+	indentOverrides      map[string]format.IndentStyle
+	threadFirstOverrides map[string]format.ThreadFirstStyle
+	list                 bool
+	write                bool
 }
 
 func main() {
@@ -47,7 +48,7 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	conf.parseDotConfig(configFile)
+	conf.parseDotConfigFile(configFile)
 
 	if flag.NArg() == 0 {
 		if conf.write {
@@ -90,7 +91,7 @@ func (pf *pathFlag) String() string {
 	return pf.p
 }
 
-func (c *config) parseDotConfig(pf pathFlag) {
+func (c *config) parseDotConfigFile(pf pathFlag) {
 	if pf.p == "" {
 		return
 	}
@@ -102,8 +103,7 @@ func (c *config) parseDotConfig(pf pathFlag) {
 		return
 	}
 	defer f.Close()
-	c.indentOverrides, err = parseDotConfig(f, pf.p)
-	if err != nil {
+	if err := c.parseDotConfig(f, pf.p); err != nil {
 		log.Fatalf("error parsing config %s: %s", pf.p, err)
 	}
 }

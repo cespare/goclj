@@ -18,11 +18,18 @@ type Printer struct {
 	IndentChar rune
 	// IndentOverrides allow setting specific indentation styles for forms.
 	IndentOverrides map[string]IndentStyle
+	// ThreadFirstStyleOverrides allow specifying custom thread-first
+	// macros.
+	ThreadFirstStyleOverrides map[string]ThreadFirstStyle
 
 	// indentStyles is the union of defaultIndents and IndentOverrides.
-	indentStyles  map[string]IndentStyle
-	specialIndent map[parse.Node]IndentStyle
-	docstrings    map[*parse.StringNode]struct{}
+	indentStyles map[string]IndentStyle
+	// threadFirstStyles is the union of defaultThreadFirstStyles and
+	// ThreadFirstStyleOverrides.
+	threadFirstStyles map[string]ThreadFirstStyle
+	specialIndent     map[parse.Node]IndentStyle
+	threadFirst       map[*parse.ListNode]struct{}
+	docstrings        map[*parse.StringNode]struct{}
 }
 
 // NewPrinter creates a printer to the given writer.
@@ -31,6 +38,7 @@ func NewPrinter(w io.Writer) *Printer {
 		bufWriter:     &bufWriter{bufio.NewWriter(w)},
 		IndentChar:    ' ',
 		specialIndent: make(map[parse.Node]IndentStyle),
+		threadFirst:   make(map[*parse.ListNode]struct{}),
 		docstrings:    make(map[*parse.StringNode]struct{}),
 	}
 }
@@ -43,6 +51,13 @@ func (p *Printer) PrintTree(t *parse.Tree) (err error) {
 	}
 	for k, v := range p.IndentOverrides {
 		p.indentStyles[k] = v
+	}
+	p.threadFirstStyles = make(map[string]ThreadFirstStyle)
+	for k, v := range defaultThreadFirstStyles {
+		p.threadFirstStyles[k] = v
+	}
+	for k, v := range p.ThreadFirstStyleOverrides {
+		p.threadFirstStyles[k] = v
 	}
 	defer func() {
 		if e := recover(); e != nil {
@@ -59,8 +74,9 @@ func (p *Printer) PrintTree(t *parse.Tree) (err error) {
 	applyTransforms(t)
 	for _, node := range t.Roots {
 		p.markDocstrings(node)
+		p.markThreadFirsts(node)
 	}
-	p.printSequence(t.Roots, 0, IndentNormal)
+	p.printSequence(t.Roots, 0, IndentNormal, false)
 	return p.bw.Flush()
 }
 
@@ -83,7 +99,7 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		return p.printNode(node.Node, w)
 	case *parse.FnLiteralNode:
 		w += p.WriteString("#(")
-		w = p.printSequence(node.Nodes, w, p.chooseIndent(node.Nodes))
+		w = p.printSequence(node.Nodes, w, p.chooseIndent(node.Nodes), false)
 		return w + p.WriteString(")")
 	case *parse.ReaderDiscardNode:
 		w += p.WriteString("#_")
@@ -103,11 +119,12 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 			style = p.chooseIndent(node.Nodes)
 		}
 		w += p.WriteString("(")
-		w = p.printSequence(node.Nodes, w, style)
+		_, threadFirst := p.threadFirst[node]
+		w = p.printSequence(node.Nodes, w, style, threadFirst)
 		return w + p.WriteString(")")
 	case *parse.MapNode:
 		w += p.WriteString("{")
-		w = p.printSequence(node.Nodes, w, indentBindings)
+		w = p.printSequence(node.Nodes, w, indentBindings, false)
 		return w + p.WriteString("}")
 	case *parse.MetadataNode:
 		w += p.WriteByte('^')
@@ -125,7 +142,7 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		return w + p.WriteString(`#"`+node.Val+`"`)
 	case *parse.SetNode:
 		w += p.WriteString("#{")
-		w = p.printSequence(node.Nodes, w, IndentNormal)
+		w = p.printSequence(node.Nodes, w, IndentNormal, false)
 		return w + p.WriteString("}")
 	case *parse.StringNode:
 		val := node.Val
@@ -157,7 +174,7 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 			style = IndentNormal
 		}
 		w += p.WriteString("[")
-		w = p.printSequence(node.Nodes, w, style)
+		w = p.printSequence(node.Nodes, w, style, false)
 		return w + p.WriteString("]")
 	default:
 		fmtErrf("%s: unhandled node type %T", node.Position(), node)
@@ -251,73 +268,30 @@ func (p *Printer) chooseListIndent(name string) IndentStyle {
 	return IndentList
 }
 
-var defaultIndents = map[string]IndentStyle{
-	"as->":            IndentListBody,
-	"binding":         IndentLet,
-	"bound-fn":        IndentListBody,
-	"case":            IndentCond1,
-	"catch":           IndentListBody,
-	"cond":            IndentCond0,
-	"cond->":          IndentCond1,
-	"cond->>":         IndentCond1,
-	"condp":           IndentCond2,
-	"def":             IndentListBody,
-	"definline":       IndentListBody,
-	"definterface":    IndentDeftype,
-	"defmacro":        IndentListBody,
-	"defmethod":       IndentListBody,
-	"defmulti":        IndentListBody,
-	"defn":            IndentListBody,
-	"defn-":           IndentListBody,
-	"defonce":         IndentListBody,
-	"defprotocol":     IndentDeftype,
-	"defrecord":       IndentDeftype,
-	"defstruct":       IndentListBody,
-	"deftest":         IndentListBody,
-	"deftest-":        IndentListBody,
-	"deftype":         IndentDeftype,
-	"doseq":           IndentListBody,
-	"dotimes":         IndentLet,
-	"doto":            IndentListBody,
-	"extend":          IndentListBody,
-	"extend-protocol": IndentDeftype,
-	"extend-type":     IndentDeftype,
-	"fn":              IndentListBody,
-	"for":             IndentListBody,
-	"if":              IndentListBody,
-	"if-let":          IndentLet,
-	"if-not":          IndentListBody,
-	"if-some":         IndentLet,
-	"let":             IndentLet,
-	"letfn":           IndentLetfn,
-	"locking":         IndentListBody,
-	"loop":            IndentLet,
-	"ns":              IndentListBody,
-	"proxy":           IndentDeftype,
-	"reify":           IndentDeftype,
-	"set-test":        IndentListBody,
-	"testing":         IndentListBody,
-	"when":            IndentListBody,
-	"when-first":      IndentLet,
-	"when-let":        IndentLet,
-	"when-not":        IndentListBody,
-	"when-some":       IndentLet,
-	"while":           IndentListBody,
-	"with-bindings":   IndentListBody,
-	"with-in-str":     IndentListBody,
-	"with-local-vars": IndentLet,
-	"with-open":       IndentLet,
-	"with-precision":  IndentListBody,
-	"with-redefs":     IndentLet,
-	"with-redefs-fn":  IndentListBody,
-	"with-test":       IndentListBody,
-}
-
 func symbolName(sym string) string {
 	if i := strings.LastIndex(sym, "/"); i >= 0 {
 		return sym[i+1:]
 	}
 	return sym
+}
+
+// A ThreadFirst style represents a variety of thread-first macro.
+type ThreadFirstStyle int
+
+const (
+	// ThreadFirstNormal is for thread-first macros that take one argument
+	// and thread through all remaining forms. -> and some-> follow this
+	// pattern.
+	ThreadFirstNormal ThreadFirstStyle = iota
+	// ThreadFirstCondArrow is the style used by cond->, which takes one
+	// argument and then threads through every other form thereafter.
+	ThreadFirstCondArrow
+)
+
+var defaultThreadFirstStyles = map[string]ThreadFirstStyle{
+	"->":     ThreadFirstNormal,
+	"cond->": ThreadFirstCondArrow,
+	"some->": ThreadFirstNormal,
 }
 
 // An IndentStyle represents the indentation strategy
@@ -399,6 +373,69 @@ const (
 	IndentCond2
 )
 
+var defaultIndents = map[string]IndentStyle{
+	"as->":            IndentListBody,
+	"assoc":           IndentCond1,
+	"binding":         IndentLet,
+	"bound-fn":        IndentListBody,
+	"case":            IndentCond1,
+	"catch":           IndentListBody,
+	"cond":            IndentCond0,
+	"cond->":          IndentCond1,
+	"cond->>":         IndentCond1,
+	"condp":           IndentCond2,
+	"def":             IndentListBody,
+	"definline":       IndentListBody,
+	"definterface":    IndentDeftype,
+	"defmacro":        IndentListBody,
+	"defmethod":       IndentListBody,
+	"defmulti":        IndentListBody,
+	"defn":            IndentListBody,
+	"defn-":           IndentListBody,
+	"defonce":         IndentListBody,
+	"defprotocol":     IndentDeftype,
+	"defrecord":       IndentDeftype,
+	"defstruct":       IndentListBody,
+	"deftest":         IndentListBody,
+	"deftest-":        IndentListBody,
+	"deftype":         IndentDeftype,
+	"doseq":           IndentListBody,
+	"dotimes":         IndentLet,
+	"doto":            IndentListBody,
+	"extend":          IndentListBody,
+	"extend-protocol": IndentDeftype,
+	"extend-type":     IndentDeftype,
+	"fn":              IndentListBody,
+	"for":             IndentListBody,
+	"if":              IndentListBody,
+	"if-let":          IndentLet,
+	"if-not":          IndentListBody,
+	"if-some":         IndentLet,
+	"let":             IndentLet,
+	"letfn":           IndentLetfn,
+	"locking":         IndentListBody,
+	"loop":            IndentLet,
+	"ns":              IndentListBody,
+	"proxy":           IndentDeftype,
+	"reify":           IndentDeftype,
+	"set-test":        IndentListBody,
+	"testing":         IndentListBody,
+	"when":            IndentListBody,
+	"when-first":      IndentLet,
+	"when-let":        IndentLet,
+	"when-not":        IndentListBody,
+	"when-some":       IndentLet,
+	"while":           IndentListBody,
+	"with-bindings":   IndentListBody,
+	"with-in-str":     IndentListBody,
+	"with-local-vars": IndentLet,
+	"with-open":       IndentLet,
+	"with-precision":  IndentListBody,
+	"with-redefs":     IndentLet,
+	"with-redefs-fn":  IndentListBody,
+	"with-test":       IndentListBody,
+}
+
 var indentExtraOffsets = [...]int{
 	indentBindings: 0,
 	IndentCond0:    1,
@@ -406,7 +443,7 @@ var indentExtraOffsets = [...]int{
 	IndentCond2:    3,
 }
 
-func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) int {
+func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle, threadFirst bool) int {
 	var (
 		w2         = w
 		needSpace  = false
@@ -436,6 +473,9 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) in
 				IndentCond1,
 				IndentCond2:
 				off := indentExtraOffsets[style]
+				if threadFirst {
+					off--
+				}
 				if idxSemantic >= 1 && idxSemantic <= off {
 					// Fall back to IndentListBody in this case.
 					// Example:

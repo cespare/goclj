@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io"
 
@@ -18,47 +17,73 @@ func (e unexpectedNodeError) Error() string {
 		e.Node, e.Node.Position())
 }
 
-func parseDotConfig(r io.Reader, name string) (map[string]format.IndentStyle, error) {
+func (c *config) parseDotConfig(r io.Reader, name string) error {
 	// We don't ask the parser for non-semantic nodes, so we don't need to
 	// prune out comments.
 	tree, err := parse.Reader(r, name, 0)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if len(tree.Roots) == 0 {
 		// I guess this is fine.
-		return nil, nil
+		return nil
 	}
 	if len(tree.Roots) > 1 {
-		return nil, unexpectedNodeError{tree.Roots[1]}
+		return unexpectedNodeError{tree.Roots[1]}
 	}
 	m, ok := tree.Roots[0].(*parse.MapNode)
 	if !ok {
-		return nil, unexpectedNodeError{tree.Roots[0]}
+		return unexpectedNodeError{tree.Roots[0]}
 	}
 	if len(m.Nodes)%2 != 0 {
-		return nil, fmt.Errorf("map value at %s has odd number of children", m.Position())
+		return fmt.Errorf("map value at %s has odd number of children", m.Position())
 	}
 	for i := 0; i < len(m.Nodes); i += 2 {
 		k := m.Nodes[i]
 		sym, ok := k.(*parse.KeywordNode)
-		if !ok || sym.Val != ":indent-overrides" {
+		if !ok {
 			continue
 		}
-		seq, err := sequence(m.Nodes[i+1])
-		if err != nil {
-			return nil, err
+		switch sym.Val {
+		case ":indent-overrides", ":thread-first-overrides":
+			seq, err := sequence(m.Nodes[i+1])
+			if err != nil {
+				return err
+			}
+			overrides, err := parseOverrides(seq, sym.Val)
+			if err != nil {
+				return err
+			}
+			switch sym.Val {
+			case ":indent-overrides":
+				c.indentOverrides = make(map[string]format.IndentStyle)
+				for k, v := range overrides {
+					style, ok := indentStyles[v]
+					if !ok {
+						return fmt.Errorf("unknown indent style %q", v)
+					}
+					c.indentOverrides[k] = style
+				}
+			case ":thread-first-overrides":
+				c.threadFirstOverrides = make(map[string]format.ThreadFirstStyle)
+				for k, v := range overrides {
+					style, ok := threadFirstStyles[v]
+					if !ok {
+						return fmt.Errorf("unknown thread-first style %q", v)
+					}
+					c.threadFirstOverrides[k] = style
+				}
+			}
 		}
-		return parseIndentOverrides(seq)
 	}
-	return nil, nil
+	return nil
 }
 
-func parseIndentOverrides(nodes []parse.Node) (map[string]format.IndentStyle, error) {
+func parseOverrides(nodes []parse.Node, name string) (map[string]string, error) {
 	if len(nodes)%2 != 0 {
-		return nil, errors.New(":indent-overrides value has odd number of children")
+		return nil, fmt.Errorf("%s value has odd number of children", name)
 	}
-	overrides := make(map[string]format.IndentStyle)
+	overrides := make(map[string]string)
 	for i := 0; i < len(nodes); i += 2 {
 		var names []string
 		seq, err := sequence(nodes[i])
@@ -81,12 +106,8 @@ func parseIndentOverrides(nodes []parse.Node) (map[string]format.IndentStyle, er
 		if !ok {
 			return nil, unexpectedNodeError{nodes[i+1]}
 		}
-		style, ok := indentStyles[kw.Val]
-		if !ok {
-			return nil, fmt.Errorf("unknown indent style %q", kw.Val)
-		}
-		for _, name := range names {
-			overrides[name] = style
+		for _, s := range names {
+			overrides[s] = kw.Val
 		}
 	}
 	return overrides, nil
@@ -118,4 +139,9 @@ var indentStyles = map[string]format.IndentStyle{
 	":cond0":     format.IndentCond0,
 	":cond1":     format.IndentCond1,
 	":cond2":     format.IndentCond2,
+}
+
+var threadFirstStyles = map[string]format.ThreadFirstStyle{
+	":normal": format.ThreadFirstNormal,
+	":cond->": format.ThreadFirstCondArrow,
 }

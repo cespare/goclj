@@ -39,7 +39,8 @@ This is a Clojure file containing a single map of options. Here's an example:
 {:indent-overrides (; Compojure
                     ["GET" "POST" "PUT" "PATCH" "DELETE" "context"] :list-body
                     ; Korma
-                    ["select" "insert" "update" "delete"] :list-body)}
+                    ["select" "insert" "update" "delete"] :list-body)
+ :thread-first-overrides ("-?>" :normal)}
 ```
 
 The configuration map may use the following keys:
@@ -154,3 +155,17 @@ parameters for indentation. By default `:cond1` is used for `condp`.
   2
     "two"
 ```
+
+### :thread-first-overrides
+
+This uses the same general paired format as `:indent-overrides`.
+
+`:thread-first-overrides` allows specifying additional thread-first macro forms.
+The following varieties are allowed:
+
+**:normal** is for typical thread-first macros such as `->` and `some->`. They
+take one argument and then all subsequent arguments have a threaded first
+parameter.
+
+**:cond->** is for `cond->` style threading, where every other argument is
+threaded (starting with the third one).
