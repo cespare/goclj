@@ -507,7 +507,7 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle, th
 			idxSemantic++
 		}
 		switch style {
-		case IndentList:
+		case IndentList, IndentCond0:
 			if i == 1 {
 				w = firstIndent + 1
 			}
