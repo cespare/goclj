@@ -398,6 +398,7 @@ var defaultIndents = map[string]IndentStyle{
 	"defn":            IndentListBody,
 	"defn-":           IndentListBody,
 	"defonce":         IndentListBody,
+	"defproject":      IndentCond2,
 	"defprotocol":     IndentDeftype,
 	"defrecord":       IndentDeftype,
 	"defstruct":       IndentListBody,
