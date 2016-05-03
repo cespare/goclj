@@ -22,6 +22,10 @@ type Printer struct {
 	// macros.
 	ThreadFirstStyleOverrides map[string]ThreadFirstStyle
 
+	// Transforms toggles the set of transformations to apply.
+	// This map overrides values in DefaultTransforms.
+	Transforms map[Transform]bool
+
 	// indentStyles is the union of defaultIndents and IndentOverrides.
 	indentStyles map[string]IndentStyle
 	// threadFirstStyles is the union of defaultThreadFirstStyles and
@@ -59,6 +63,15 @@ func (p *Printer) PrintTree(t *parse.Tree) (err error) {
 	for k, v := range p.ThreadFirstStyleOverrides {
 		p.threadFirstStyles[k] = v
 	}
+	if p.Transforms == nil {
+		p.Transforms = DefaultTransforms
+	} else {
+		for k, v := range DefaultTransforms {
+			if _, ok := p.Transforms[k]; !ok {
+				p.Transforms[k] = v
+			}
+		}
+	}
 	defer func() {
 		if e := recover(); e != nil {
 			switch e := e.(type) {
@@ -71,7 +84,7 @@ func (p *Printer) PrintTree(t *parse.Tree) (err error) {
 			}
 		}
 	}()
-	applyTransforms(t)
+	applyTransforms(t, p.Transforms)
 	for _, node := range t.Roots {
 		p.markDocstrings(node)
 		p.markThreadFirsts(node)

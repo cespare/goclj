@@ -7,28 +7,79 @@ import (
 	"github.com/cespare/goclj/parse"
 )
 
-// applyTransforms performs small fixes to the tree t:
-//
-//   - reorder (sort) imports and requires
-//   - remove trailing \n nodes (dangling close parens)
-//   - move arg vectors of defns to the same line if appropriate
-//   - move dispatch-val of a defmethod to the same line
-//   - remove >1 consecutive blank lines
-func applyTransforms(t *parse.Tree) {
+// A Transform is some tree transformation that can be applied after parsing and
+// before printing. Some Transforms may use some heuristics that cause them to
+// change code semantics in certain cases; these are clearly indicated and none
+// of these are enabled by default.
+type Transform int
+
+const (
+	// TransformSortImportRequire sorts :import and :require declarations
+	// in ns blocks.
+	TransformSortImportRequire Transform = iota
+	// TransformRemoveTrailingNewlines removes extra newlines following
+	// sequence-like forms, so that parentheses are written on the same
+	// line. For example,
+	//   (foo bar
+	//    )
+	// becomes
+	//   (foo bar)
+	TransformRemoveTrailingNewlines
+	// TransformFixDefnArglistNewline moves the arg vector of defns to the
+	// same line, if appropriate:
+	//   (defn foo
+	//     [x] ...)
+	// becomes
+	//   (defn foo [x]
+	//     ...)
+	// if there's no newline after the arg list.
+	TransformFixDefnArglistNewline
+	// TransformFixDefmethodDispatchValNewline moves the dispatch-val of a
+	// defmethod to the same line, so that
+	//   (defmethod foo
+	//     :bar
+	//     [x] ...)
+	// becomes
+	//   (defmethod foo :bar
+	//     [x] ...)
+	TransformFixDefmethodDispatchValNewline
+	// TransformRemoveExtraBlankLines consolidates consecutive blank lines
+	// into a single blank line.
+	TransformRemoveExtraBlankLines
+)
+
+var DefaultTransforms = map[Transform]bool{
+	TransformSortImportRequire:              true,
+	TransformRemoveTrailingNewlines:         true,
+	TransformFixDefnArglistNewline:          true,
+	TransformFixDefmethodDispatchValNewline: true,
+	TransformRemoveExtraBlankLines:          true,
+}
+
+func applyTransforms(t *parse.Tree, transforms map[Transform]bool) {
 	for _, root := range t.Roots {
-		if goclj.FnFormSymbol(root, "ns") {
+		if transforms[TransformSortImportRequire] &&
+			goclj.FnFormSymbol(root, "ns") {
 			sortNS(root)
 		}
-		removeTrailingNewlines(root)
-		if goclj.FnFormSymbol(root, "defn") {
+		if transforms[TransformRemoveTrailingNewlines] {
+			removeTrailingNewlines(root)
+		}
+		if transforms[TransformFixDefnArglistNewline] &&
+			goclj.FnFormSymbol(root, "defn") {
 			fixDefnArglist(root)
 		}
-		if goclj.FnFormSymbol(root, "defmethod") {
+		if transforms[TransformFixDefmethodDispatchValNewline] &&
+			goclj.FnFormSymbol(root, "defmethod") {
 			fixDefmethodDispatchVal(root)
 		}
-		removeExtraBlankLinesRecursive(root)
+		if transforms[TransformRemoveExtraBlankLines] {
+			removeExtraBlankLinesRecursive(root)
+		}
 	}
-	t.Roots = removeExtraBlankLines(t.Roots)
+	if transforms[TransformRemoveExtraBlankLines] {
+		t.Roots = removeExtraBlankLines(t.Roots)
+	}
 }
 
 func sortNS(ns parse.Node) {
@@ -112,13 +163,6 @@ func removeTrailingNewlines(n parse.Node) {
 }
 
 func fixDefnArglist(defn parse.Node) {
-	// For defns, change
-	//   (defn foo
-	//     [x] ...)
-	// to
-	//   (defn foo [x]
-	//     ...)
-	// if there's no newline after the arg list.
 	nodes := defn.Children()
 	if len(nodes) < 5 {
 		return
@@ -135,13 +179,6 @@ func fixDefnArglist(defn parse.Node) {
 }
 
 func fixDefmethodDispatchVal(defmethod parse.Node) {
-	// For defmethods, change
-	//   (defmethod foo
-	//     :bar
-	//     [x] ...)
-	// to
-	//   (defmethod foo :bar
-	//     [x] ...)
 	nodes := defmethod.Children()
 	if len(nodes) < 5 {
 		return

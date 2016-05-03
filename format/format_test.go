@@ -67,6 +67,23 @@ func TestCustomIndent(t *testing.T) {
 	check(t, file1, buf.Bytes(), want)
 }
 
+func TestCustomTransforms(t *testing.T) {
+	const file0 = "transforms_before.clj"
+	const file1 = "transforms_after.clj"
+	tree := parseFile(t, file0)
+	var buf bytes.Buffer
+	p := NewPrinter(&buf)
+	p.Transforms = map[Transform]bool{
+		TransformSortImportRequire:     false,
+		TransformFixDefnArglistNewline: false,
+	}
+	if err := p.PrintTree(tree); err != nil {
+		t.Fatal(err)
+	}
+	want := readFile(t, file1)
+	check(t, file0, buf.Bytes(), want)
+}
+
 func TestIssue41(t *testing.T) {
 	const file = "issue41.clj"
 	tree := parseFile(t, file)
