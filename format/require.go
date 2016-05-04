@@ -90,15 +90,7 @@ func (rl *requireList) merge(r *require) *require {
 		return r2
 	}
 	if r2.origRefer != nil {
-		r2.refer = make(map[string]struct{})
-		for _, n := range r2.origRefer {
-			n, ok := n.(*parse.SymbolNode)
-			if !ok {
-				continue
-			}
-			r2.refer[n.Val] = struct{}{}
-		}
-		r2.origRefer = nil
+		r2.extractOrigRefer()
 	}
 	for _, n := range r.origRefer {
 		n, ok := n.(*parse.SymbolNode)
@@ -108,6 +100,16 @@ func (rl *requireList) merge(r *require) *require {
 		r2.refer[n.Val] = struct{}{}
 	}
 	return r2
+}
+
+func (r *require) extractOrigRefer() {
+	r.refer = make(map[string]struct{})
+	for _, n := range r.origRefer {
+		if n, ok := n.(*parse.SymbolNode); ok {
+			r.refer[n.Val] = struct{}{}
+		}
+	}
+	r.origRefer = nil
 }
 
 func (rl *requireList) parseRequireUse(n *parse.ListNode, use bool) {

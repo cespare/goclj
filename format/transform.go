@@ -17,6 +17,7 @@ const (
 	// TransformSortImportRequire sorts :import and :require declarations
 	// in ns blocks.
 	TransformSortImportRequire Transform = iota
+
 	// TransformRemoveTrailingNewlines removes extra newlines following
 	// sequence-like forms, so that parentheses are written on the same
 	// line. For example,
@@ -25,6 +26,7 @@ const (
 	// becomes
 	//   (foo bar)
 	TransformRemoveTrailingNewlines
+
 	// TransformFixDefnArglistNewline moves the arg vector of defns to the
 	// same line, if appropriate:
 	//   (defn foo
@@ -34,6 +36,7 @@ const (
 	//     ...)
 	// if there's no newline after the arg list.
 	TransformFixDefnArglistNewline
+
 	// TransformFixDefmethodDispatchValNewline moves the dispatch-val of a
 	// defmethod to the same line, so that
 	//   (defmethod foo
@@ -43,13 +46,21 @@ const (
 	//   (defmethod foo :bar
 	//     [x] ...)
 	TransformFixDefmethodDispatchValNewline
+
 	// TransformRemoveExtraBlankLines consolidates consecutive blank lines
 	// into a single blank line.
 	TransformRemoveExtraBlankLines
+
 	// TransformUseToRequire consolidates :require and :use blocks inside ns
 	// declarations, rewriting them using :require if possible.
 	// It is not enabled by default.
 	TransformUseToRequire
+
+	// TransformRemoveUnusedRequires uses some simple heuristics to remove
+	// some unused :require statements:
+	//   [foo :as x] ; if there is no x/y in the ns, this is removed
+	//   [foo :refer [x]] ; if x does not appear in the ns, this is removed
+	TransformRemoveUnusedRequires
 )
 
 var DefaultTransforms = map[Transform]bool{
@@ -61,10 +72,17 @@ var DefaultTransforms = map[Transform]bool{
 }
 
 func applyTransforms(t *parse.Tree, transforms map[Transform]bool) {
+	var syms *symbolCache
+	if transforms[TransformRemoveUnusedRequires] {
+		syms = findSymbols(t.Roots)
+	}
 	for _, root := range t.Roots {
 		if goclj.FnFormSymbol(root, "ns") {
 			if transforms[TransformUseToRequire] {
 				useToRequire(root)
+			}
+			if transforms[TransformRemoveUnusedRequires] {
+				removeUnusedRequires(root, syms)
 			}
 			if transforms[TransformSortImportRequire] {
 				sortNS(root)
@@ -118,6 +136,23 @@ func useToRequire(ns parse.Node) {
 	if insertIndex != -1 {
 		nodes = append(nodes[:insertIndex],
 			append(rl.render(), nodes[insertIndex:]...)...)
+	}
+	ns.SetChildren(nodes)
+}
+
+func removeUnusedRequires(ns parse.Node, syms *symbolCache) {
+	nodes := ns.Children()
+	for i, n := range nodes {
+		if goclj.FnFormKeyword(n, ":require") {
+			rl := newRequireList()
+			rl.parseRequireUse(n.(*parse.ListNode), false)
+			for name, r := range rl.m {
+				if syms.unused(r) {
+					delete(rl.m, name)
+				}
+			}
+			nodes[i] = rl.render()[0]
+		}
 	}
 	ns.SetChildren(nodes)
 }

@@ -52,6 +52,18 @@ func TestTransformsUseToRequire(t *testing.T) {
 	)
 }
 
+func TestTransformsRemoveUnusedRequires(t *testing.T) {
+	testChangeTransforms(
+		t,
+		"transform/unusedrequires_before.clj",
+		"transform/unusedrequires_after.clj",
+		map[Transform]bool{
+			TransformUseToRequire:         true,
+			TransformRemoveUnusedRequires: true,
+		},
+	)
+}
+
 func TestCustomIndent(t *testing.T) {
 	const file0 = "indent1.clj"
 	const file1 = "indent1_custom.clj"

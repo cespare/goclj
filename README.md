@@ -97,6 +97,13 @@ Consolidate consecutive blank lines into a single blank line.
 Consolidate `:require` and `:use` blocks inside ns declarations, rewriting them
 using `:require` if possible.
 
+### remove-unused-requires
+
+Use simple heuristics to remove some probably-unused :require statements:
+
+    [foo :as x] ; if there is no x/y in the ns, this is removed
+    [foo :refer [x]] ; if x does not appear in the ns, this is removed
+
 ## Cljfmt configuration
 
 You can optionally use a config file at `$HOME/.cljfmt` (override with `-c`).

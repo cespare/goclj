@@ -105,6 +105,8 @@ func (tf transformFlag) Set(v string) error {
 		t = format.TransformRemoveExtraBlankLines
 	case "use-to-require":
 		t = format.TransformUseToRequire
+	case "remove-unused-requires":
+		t = format.TransformRemoveUnusedRequires
 	default:
 		return fmt.Errorf("unrecognized transform %q", v)
 	}
