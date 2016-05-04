@@ -339,23 +339,31 @@ func parseUseSeq(nodes []parse.Node) (r *require, ok bool) {
 		if !ok {
 			return nil, false
 		}
-		if kw.Val != ":only" {
-			return nil, false
-		}
-		switch nodes[2].(type) {
-		case *parse.ListNode, *parse.VectorNode:
-		default:
-			return nil, false
-		}
-		r.origRefer = nodes[2].Children()
-		for _, n := range r.origRefer {
-			switch n.(type) {
-			case *parse.SymbolNode,
-				*parse.CommentNode,
-				*parse.NewlineNode:
+		switch kw.Val {
+		case ":as":
+			n, ok := nodes[2].(*parse.SymbolNode)
+			if !ok {
+				return nil, false
+			}
+			r.as = map[string]struct{}{n.Val: struct{}{}}
+		case ":only":
+			switch nodes[2].(type) {
+			case *parse.ListNode, *parse.VectorNode:
 			default:
 				return nil, false
 			}
+			r.origRefer = nodes[2].Children()
+			for _, n := range r.origRefer {
+				switch n.(type) {
+				case *parse.SymbolNode,
+					*parse.CommentNode,
+					*parse.NewlineNode:
+				default:
+					return nil, false
+				}
+			}
+		default:
+			return nil, false
 		}
 	default:
 		return nil, false

@@ -14,6 +14,7 @@
   (:use c
         (x :only [z
                   y]) ; g
+        [q0 :as q1]
         [z]
         3
         ; below1
