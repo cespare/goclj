@@ -83,12 +83,6 @@ func (rl *requireList) render() []parse.Node {
 		&parse.KeywordNode{Val: ":require"},
 	}
 	for _, r := range rl.m {
-		if len(r.as) == 0 && !r.referAll && len(r.refer) == 0 {
-			nodes = append(nodes,
-				&parse.SymbolNode{Val: r.name},
-				&parse.NewlineNode{})
-			continue
-		}
 		parts := []parse.Node{&parse.SymbolNode{Val: r.name}}
 		as := sortStringSet(r.as)
 		// If there are multiple :as definitions, emit a separate
