@@ -46,7 +46,10 @@ const (
 	// TransformRemoveExtraBlankLines consolidates consecutive blank lines
 	// into a single blank line.
 	TransformRemoveExtraBlankLines
-
+	// TransformUseToRequire consolidates :require and :use blocks inside ns
+	// declarations, rewriting them using :require if possible.
+	// This transformation currently removes all comments within ns blocks.
+	// It is not enabled by default.
 	TransformUseToRequire
 )
 
