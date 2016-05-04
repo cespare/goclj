@@ -20,9 +20,9 @@ func TestListbody(t *testing.T)    { testFixture(t, "listbody.clj") }
 func TestThreadFirst(t *testing.T) { testFixture(t, "threadfirst.clj") }
 func TestCond(t *testing.T)        { testFixture(t, "cond.clj") }
 
-func TestStyleGuide(t *testing.T) { testTransform(t, "styleguide_bad.clj", "styleguide_good.clj") }
-func TestNewline(t *testing.T)    { testTransform(t, "newline_before.clj", "newline_after.clj") }
-func TestRequire(t *testing.T)    { testTransform(t, "require_before.clj", "require_after.clj") }
+func TestStyleGuide(t *testing.T) { testChange(t, "styleguide_bad.clj", "styleguide_good.clj") }
+func TestNewline(t *testing.T)    { testChange(t, "newline_before.clj", "newline_after.clj") }
+func TestRequire(t *testing.T)    { testChange(t, "require_before.clj", "require_after.clj") }
 
 func TestIndent(t *testing.T)  { testFixture(t, "indent.clj") }
 func TestIssue5(t *testing.T)  { testFixture(t, "issue5.clj") }
@@ -37,76 +37,73 @@ func TestIssue19(t *testing.T) { testFixture(t, "issue19.clj") }
 func TestIssue21(t *testing.T) { testFixture(t, "issue21.clj") }
 func TestIssue23(t *testing.T) { testFixture(t, "issue23.clj") }
 
-func TestIssue6(t *testing.T)  { testTransform(t, "issue6_before.clj", "issue6_after.clj") }
-func TestIssue7(t *testing.T)  { testTransform(t, "issue7_before.clj", "issue7_after.clj") }
-func TestIssue25(t *testing.T) { testTransform(t, "issue25_before.clj", "issue25_after.clj") }
-func TestIssue26(t *testing.T) { testTransform(t, "issue26_before.clj", "issue26_after.clj") }
-func TestIssue32(t *testing.T) { testTransform(t, "issue32_before.clj", "issue32_after.clj") }
+func TestIssue6(t *testing.T)  { testChange(t, "issue6_before.clj", "issue6_after.clj") }
+func TestIssue7(t *testing.T)  { testChange(t, "issue7_before.clj", "issue7_after.clj") }
+func TestIssue25(t *testing.T) { testChange(t, "issue25_before.clj", "issue25_after.clj") }
+func TestIssue26(t *testing.T) { testChange(t, "issue26_before.clj", "issue26_after.clj") }
+func TestIssue32(t *testing.T) { testChange(t, "issue32_before.clj", "issue32_after.clj") }
+
+func TestTransformsUseToRequire(t *testing.T) {
+	testChangeTransforms(
+		t,
+		"transform/use2require_before.clj",
+		"transform/use2require_after.clj",
+		map[Transform]bool{TransformUseToRequire: true},
+	)
+}
 
 func TestCustomIndent(t *testing.T) {
 	const file0 = "indent1.clj"
 	const file1 = "indent1_custom.clj"
-	tree := parseFile(t, file0)
-	var buf bytes.Buffer
-	if err := NewPrinter(&buf).PrintTree(tree); err != nil {
-		t.Fatal(err)
-	}
-	want := readFile(t, file0)
-	check(t, file0, buf.Bytes(), want)
+	testFixture(t, file0)
 
-	buf.Reset()
-	p := NewPrinter(&buf)
-	p.IndentOverrides = map[string]IndentStyle{
-		"delete": IndentListBody,
-		"up":     IndentListBody,
+	f := func(p *Printer) {
+		p.IndentOverrides = map[string]IndentStyle{
+			"delete": IndentListBody,
+			"up":     IndentListBody,
+		}
 	}
-	if err := p.PrintTree(tree); err != nil {
-		t.Fatal(err)
-	}
-	want = readFile(t, file1)
-	check(t, file1, buf.Bytes(), want)
+	testChangeCustom(t, file0, file1, f)
 }
 
 func TestCustomTransforms(t *testing.T) {
-	const file0 = "transforms_before.clj"
-	const file1 = "transforms_after.clj"
-	tree := parseFile(t, file0)
-	var buf bytes.Buffer
-	p := NewPrinter(&buf)
-	p.Transforms = map[Transform]bool{
+	const before = "transforms_before.clj"
+	const after = "transforms_after.clj"
+	testChangeTransforms(t, before, after, map[Transform]bool{
 		TransformSortImportRequire:     false,
 		TransformFixDefnArglistNewline: false,
-	}
-	if err := p.PrintTree(tree); err != nil {
-		t.Fatal(err)
-	}
-	want := readFile(t, file1)
-	check(t, file0, buf.Bytes(), want)
+	})
 }
 
 func TestIssue41(t *testing.T) {
 	const file = "issue41.clj"
-	tree := parseFile(t, file)
-	var buf bytes.Buffer
-	p := NewPrinter(&buf)
-	p.IndentOverrides = map[string]IndentStyle{
-		"cond-blah-blah-blah": IndentCond0,
+	f := func(p *Printer) {
+		p.IndentOverrides = map[string]IndentStyle{
+			"cond-blah-blah-blah": IndentCond0,
+		}
 	}
-	if err := p.PrintTree(tree); err != nil {
-		t.Fatal(err)
-	}
-	want := readFile(t, file)
-	check(t, file, buf.Bytes(), want)
+	testChangeCustom(t, file, file, f)
 }
 
 func testFixture(t *testing.T, filename string) {
-	testTransform(t, filename, filename)
+	testChange(t, filename, filename)
 }
 
-func testTransform(t *testing.T, before, after string) {
+func testChange(t *testing.T, before, after string) {
+	testChangeCustom(t, before, after, func(p *Printer) {})
+}
+
+func testChangeTransforms(t *testing.T, before, after string, transforms map[Transform]bool) {
+	f := func(p *Printer) { p.Transforms = transforms }
+	testChangeCustom(t, before, after, f)
+}
+
+func testChangeCustom(t *testing.T, before, after string, f func(p *Printer)) {
 	tree := parseFile(t, before)
 	var buf bytes.Buffer
-	if err := NewPrinter(&buf).PrintTree(tree); err != nil {
+	p := NewPrinter(&buf)
+	f(p)
+	if err := p.PrintTree(tree); err != nil {
 		t.Fatal(err)
 	}
 	want := readFile(t, after)

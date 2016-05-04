@@ -46,6 +46,8 @@ const (
 	// TransformRemoveExtraBlankLines consolidates consecutive blank lines
 	// into a single blank line.
 	TransformRemoveExtraBlankLines
+
+	TransformUseToRequire
 )
 
 var DefaultTransforms = map[Transform]bool{
@@ -58,9 +60,13 @@ var DefaultTransforms = map[Transform]bool{
 
 func applyTransforms(t *parse.Tree, transforms map[Transform]bool) {
 	for _, root := range t.Roots {
-		if transforms[TransformSortImportRequire] &&
-			goclj.FnFormSymbol(root, "ns") {
-			sortNS(root)
+		if goclj.FnFormSymbol(root, "ns") {
+			if transforms[TransformUseToRequire] {
+				useToRequire(root)
+			}
+			if transforms[TransformSortImportRequire] {
+				sortNS(root)
+			}
 		}
 		if transforms[TransformRemoveTrailingNewlines] {
 			removeTrailingNewlines(root)
@@ -80,6 +86,44 @@ func applyTransforms(t *parse.Tree, transforms map[Transform]bool) {
 	if transforms[TransformRemoveExtraBlankLines] {
 		t.Roots = removeExtraBlankLines(t.Roots)
 	}
+}
+
+func useToRequire(ns parse.Node) {
+	rl := newRequireList()
+	insertIndex := -1
+	prevSkipped := false
+	nodes := []parse.Node{&parse.SymbolNode{Val: "ns"}}
+	i := 0
+	for _, n := range ns.Children()[1:] {
+		if prevSkipped && goclj.Newline(n) {
+			prevSkipped = false
+			continue
+		}
+		prevSkipped = false
+		if goclj.FnFormKeyword(n, ":require") {
+			rl.parseRequire(n.(*parse.ListNode))
+			if insertIndex == -1 {
+				insertIndex = i + 1
+			}
+			prevSkipped = true
+			continue
+		}
+		if goclj.FnFormKeyword(n, ":use") {
+			rl.parseUse(n.(*parse.ListNode))
+			if insertIndex == -1 {
+				insertIndex = i + 1
+			}
+			prevSkipped = true
+			continue
+		}
+		nodes = append(nodes, n)
+		i++
+	}
+	if insertIndex != -1 {
+		nodes = append(nodes[:insertIndex],
+			append(rl.render(), nodes[insertIndex:]...)...)
+	}
+	ns.SetChildren(nodes)
 }
 
 func sortNS(ns parse.Node) {
