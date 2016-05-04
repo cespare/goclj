@@ -289,7 +289,7 @@ func (l importRequireList) Len() int      { return len(l) }
 func (l importRequireList) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
 
 func (l importRequireList) Less(i, j int) bool {
-	// Some case are nonsenical; don't particularly care how those are sorted.
+	// Some cases are nonsenical; don't particularly care how those are sorted.
 	n1, n2 := l[i].Node, l[j].Node
 	if s1, ok := n1.(*parse.SymbolNode); ok {
 		if s2, ok := n2.(*parse.SymbolNode); ok {
@@ -317,7 +317,10 @@ func (l importRequireList) Less(i, j int) bool {
 			}
 			return false // [3] >= [a]
 		}
-		return false // [a] >= 3
+		if _, ok := n2.(*parse.SymbolNode); ok {
+			return false // [a] >= b
+		}
+		return true // [a] < 3
 	}
 	return false // 3 >= 3
 }

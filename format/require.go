@@ -196,6 +196,9 @@ func parseRequireSeq(nodes []parse.Node) (r *require, ok bool) {
 	r = &require{name: nodes[0].(*parse.SymbolNode).Val}
 	var as string
 	var refer []parse.Node
+	if (len(nodes)-1)%2 != 0 {
+		return nil, false
+	}
 	numPairs := (len(nodes) - 1) / 2
 	for i := 0; i < numPairs; i++ {
 		k, v := nodes[i*2+1], nodes[i*2+2]
