@@ -104,11 +104,6 @@ func (rl *requireList) render() []parse.Node {
 			nodes = append(nodes, n, &parse.NewlineNode{})
 			as = as[1:]
 		}
-		if len(as) > 0 {
-			parts = append(parts,
-				&parse.KeywordNode{Val: ":as"},
-				&parse.SymbolNode{Val: as[0]})
-		}
 		if r.referAll {
 			parts = append(parts,
 				&parse.KeywordNode{Val: ":refer"},
@@ -121,6 +116,11 @@ func (rl *requireList) render() []parse.Node {
 			parts = append(parts,
 				&parse.KeywordNode{Val: ":refer"},
 				&parse.VectorNode{Nodes: refs})
+		}
+		if len(as) > 0 {
+			parts = append(parts,
+				&parse.KeywordNode{Val: ":as"},
+				&parse.SymbolNode{Val: as[0]})
 		}
 		n := &parse.VectorNode{Nodes: parts}
 		nodes = append(nodes, n, &parse.NewlineNode{})
