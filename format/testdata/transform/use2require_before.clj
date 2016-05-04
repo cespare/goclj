@@ -3,9 +3,11 @@
             a
             [a :as b]
             (c :as d)
-            [a :refer [d e f]])
+            [a :refer [f e
+                       d]])
   (:use c
-        (x :only [y])
+        (x :only [z
+                  y])
         [z]
         3)
   (:require [a :as g :refer [h]]

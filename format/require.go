@@ -11,7 +11,11 @@ type require struct {
 	name     string
 	as       map[string]struct{}
 	referAll bool
-	refer    map[string]struct{}
+	// origRefer is the original refer vector/list.
+	// It is preserved and reused if possible, but if two refer lists are
+	// merged, then refer is used instead (and origRefer is set to nil).
+	origRefer []parse.Node
+	refer     map[string]struct{}
 }
 
 type requireList struct {
@@ -41,12 +45,32 @@ func (rl *requireList) merge(r *require) {
 	}
 	r2.referAll = r.referAll || r2.referAll
 	if r.refer != nil {
-		if r2.refer == nil {
-			r2.refer = make(map[string]struct{})
+		panic("merge arg has non-nil refer")
+	}
+	if len(r.origRefer) == 0 {
+		return
+	}
+	if r2.origRefer == nil && r2.refer == nil {
+		r2.origRefer = r.origRefer
+		return
+	}
+	if r2.origRefer != nil {
+		r2.refer = make(map[string]struct{})
+		for _, n := range r2.origRefer {
+			n, ok := n.(*parse.SymbolNode)
+			if !ok {
+				continue
+			}
+			r2.refer[n.Val] = struct{}{}
 		}
-		for s := range r.refer {
-			r2.refer[s] = struct{}{}
+		r2.origRefer = nil
+	}
+	for _, n := range r.origRefer {
+		n, ok := n.(*parse.SymbolNode)
+		if !ok {
+			continue
 		}
+		r2.refer[n.Val] = struct{}{}
 	}
 }
 
@@ -103,11 +127,16 @@ func (rl *requireList) render() []parse.Node {
 				&parse.KeywordNode{Val: ":as"},
 				&parse.SymbolNode{Val: as[0]})
 		}
-		if r.referAll {
+		switch {
+		case r.referAll:
 			parts = append(parts,
 				&parse.KeywordNode{Val: ":refer"},
 				&parse.KeywordNode{Val: ":all"})
-		} else if len(r.refer) > 0 {
+		case r.origRefer != nil:
+			parts = append(parts,
+				&parse.KeywordNode{Val: ":refer"},
+				&parse.VectorNode{Nodes: r.origRefer})
+		case len(r.refer) > 0:
 			var refs []parse.Node
 			for _, s := range sortStringSet(r.refer) {
 				refs = append(refs, &parse.SymbolNode{Val: s})
@@ -166,7 +195,7 @@ func parseRequireSeq(nodes []parse.Node) (r *require, ok bool) {
 	}
 	r = &require{name: nodes[0].(*parse.SymbolNode).Val}
 	var as string
-	var refer []string
+	var refer []parse.Node
 	numPairs := (len(nodes) - 1) / 2
 	for i := 0; i < numPairs; i++ {
 		k, v := nodes[i*2+1], nodes[i*2+2]
@@ -187,13 +216,15 @@ func parseRequireSeq(nodes []parse.Node) (r *require, ok bool) {
 		case ":refer":
 			switch v.(type) {
 			case *parse.ListNode, *parse.VectorNode:
-				refer = nil
-				for _, n := range v.Children() {
-					ref, ok := n.(*parse.SymbolNode)
-					if !ok {
+				refer = v.Children()
+				for _, n := range refer {
+					switch n.(type) {
+					case *parse.SymbolNode,
+						*parse.CommentNode,
+						*parse.NewlineNode:
+					default:
 						return nil, false
 					}
-					refer = append(refer, ref.Val)
 				}
 			default:
 				return nil, false
@@ -205,10 +236,7 @@ func parseRequireSeq(nodes []parse.Node) (r *require, ok bool) {
 	if as != "" {
 		r.as = map[string]struct{}{as: struct{}{}}
 	}
-	r.refer = make(map[string]struct{})
-	for _, s := range refer {
-		r.refer[s] = struct{}{}
-	}
+	r.origRefer = refer
 	return r, true
 }
 
@@ -244,13 +272,15 @@ func parseUseSeq(nodes []parse.Node) (r *require, ok bool) {
 		default:
 			return nil, false
 		}
-		r.refer = make(map[string]struct{})
-		for _, n := range nodes[2].Children() {
-			sym, ok := n.(*parse.SymbolNode)
-			if !ok {
+		r.origRefer = nodes[2].Children()
+		for _, n := range r.origRefer {
+			switch n.(type) {
+			case *parse.SymbolNode,
+				*parse.CommentNode,
+				*parse.NewlineNode:
+			default:
 				return nil, false
 			}
-			r.refer[sym.Val] = struct{}{}
 		}
 	default:
 		return nil, false
