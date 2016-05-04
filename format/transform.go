@@ -148,7 +148,7 @@ func sortImportRequire(n *parse.ListNode) {
 		switch node := node.(type) {
 		case *parse.CommentNode:
 			if afterSemanticNode {
-				sorted[len(sorted)-1].CommentBeside = node
+				sorted[len(sorted)-1].commentBeside = node
 			} else {
 				lineComments = append(lineComments, node)
 			}
@@ -156,8 +156,8 @@ func sortImportRequire(n *parse.ListNode) {
 			afterSemanticNode = false
 		default:
 			ir := &importRequire{
-				CommentsAbove: lineComments,
-				Node:          node,
+				commentsAbove: lineComments,
+				node:          node,
 			}
 			sorted = append(sorted, ir)
 			lineComments = nil
@@ -167,12 +167,12 @@ func sortImportRequire(n *parse.ListNode) {
 	sort.Stable(sorted)
 	newNodes := []parse.Node{nodes[0]}
 	for _, ir := range sorted {
-		for _, cn := range ir.CommentsAbove {
+		for _, cn := range ir.commentsAbove {
 			newNodes = append(newNodes, cn, &parse.NewlineNode{})
 		}
-		newNodes = append(newNodes, ir.Node)
-		if ir.CommentBeside != nil {
-			newNodes = append(newNodes, ir.CommentBeside)
+		newNodes = append(newNodes, ir.node)
+		if ir.commentBeside != nil {
+			newNodes = append(newNodes, ir.commentBeside)
 		}
 		newNodes = append(newNodes, &parse.NewlineNode{})
 	}
@@ -278,9 +278,9 @@ func removeExtraBlankLines(nodes []parse.Node) []parse.Node {
 
 // An importRequire is an import/require with associated comment nodes.
 type importRequire struct {
-	CommentsAbove []*parse.CommentNode
-	CommentBeside *parse.CommentNode
-	Node          parse.Node
+	commentsAbove []*parse.CommentNode
+	commentBeside *parse.CommentNode
+	node          parse.Node
 }
 
 type importRequireList []*importRequire
@@ -290,7 +290,7 @@ func (l importRequireList) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
 
 func (l importRequireList) Less(i, j int) bool {
 	// Some cases are nonsenical; don't particularly care how those are sorted.
-	n1, n2 := l[i].Node, l[j].Node
+	n1, n2 := l[i].node, l[j].node
 	if s1, ok := n1.(*parse.SymbolNode); ok {
 		if s2, ok := n2.(*parse.SymbolNode); ok {
 			return s1.Val < s2.Val
