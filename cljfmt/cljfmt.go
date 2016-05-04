@@ -23,11 +23,14 @@ cljfmt reads from standard input.
 Flags:
 `, os.Args[0])
 	flag.PrintDefaults()
+	fmt.Fprintln(os.Stderr, `
+See the goclj README for more documentation of the available transforms.`)
 }
 
 type config struct {
 	indentOverrides      map[string]format.IndentStyle
 	threadFirstOverrides map[string]format.ThreadFirstStyle
+	transforms           map[format.Transform]bool
 	list                 bool
 	write                bool
 }
@@ -39,12 +42,18 @@ func main() {
 	if home, ok := os.LookupEnv("HOME"); ok {
 		configFile.p = filepath.Join(home, ".cljfmt")
 	}
-	var conf config
+	conf := config{
+		transforms: make(map[format.Transform]bool),
+	}
 	flag.Var(&configFile, "c", "path to config file")
 	flag.BoolVar(&conf.list, "l", false,
 		"print files whose formatting differs from cljfmt's")
 	flag.BoolVar(&conf.write, "w", false,
 		"write result to (source) file instead of stdout")
+	flag.Var(transformFlag{conf.transforms, true}, "enable-transform",
+		"turn on the named transform")
+	flag.Var(transformFlag{conf.transforms, false}, "disable-transform",
+		"turn off the named transform")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -74,6 +83,37 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+}
+
+type transformFlag struct {
+	m map[format.Transform]bool
+	b bool
+}
+
+func (tf transformFlag) Set(v string) error {
+	var t format.Transform
+	switch v {
+	case "sort-import-require":
+		t = format.TransformSortImportRequire
+	case "remove-trailing-newlines":
+		t = format.TransformRemoveTrailingNewlines
+	case "fix-defn-arglist-newline":
+		t = format.TransformFixDefnArglistNewline
+	case "fix-defmethod-dispatch-val-newline":
+		t = format.TransformFixDefmethodDispatchValNewline
+	case "remove-extra-blank-lines":
+		t = format.TransformRemoveExtraBlankLines
+	case "use-to-require":
+		t = format.TransformUseToRequire
+	default:
+		return fmt.Errorf("unrecognized transform %q", v)
+	}
+	tf.m[t] = tf.b
+	return nil
+}
+
+func (tf transformFlag) String() string {
+	return "none"
 }
 
 type pathFlag struct {
@@ -146,6 +186,7 @@ func (c *config) processFile(filename string, in io.Reader) error {
 	p := format.NewPrinter(&buf2)
 	p.IndentChar = ' '
 	p.IndentOverrides = c.indentOverrides
+	p.Transforms = c.transforms
 	if err := p.PrintTree(t); err != nil {
 		return err
 	}
