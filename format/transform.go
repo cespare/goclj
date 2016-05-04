@@ -103,16 +103,10 @@ func useToRequire(ns parse.Node) {
 			continue
 		}
 		prevSkipped = false
-		if goclj.FnFormKeyword(n, ":require") {
-			rl.parseRequire(n.(*parse.ListNode))
-			if insertIndex == -1 {
-				insertIndex = i + 1
-			}
-			prevSkipped = true
-			continue
-		}
-		if goclj.FnFormKeyword(n, ":use") {
-			rl.parseUse(n.(*parse.ListNode))
+		if goclj.FnFormKeyword(n, ":require", ":use") {
+			ln := n.(*parse.ListNode)
+			name := ln.Nodes[0].(*parse.KeywordNode).Val
+			rl.parseRequireUse(ln, name == ":use")
 			if insertIndex == -1 {
 				insertIndex = i + 1
 			}

@@ -1,11 +1,20 @@
 (ns a
-  (:require [a :as b]
+  (:require ; b
+            ; c
+            ; f
+            ; e
+            ; h
+            [a :as b]
             [a :as g :refer [d e f h]]
-            [a [b :as c]]
+            [a [b :as c]] ; d
             [c :as d :refer :all]
+            ; i
             [i]
             [x :refer [z
-                       y]]
+                       y]] ; g
             [z :refer :all]
-            #{blah})
+            #{blah} ; a
+            ; below0
+            ; below1
+            )
   (:use 3))

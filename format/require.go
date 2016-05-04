@@ -16,24 +16,59 @@ type require struct {
 	// merged, then refer is used instead (and origRefer is set to nil).
 	origRefer []parse.Node
 	refer     map[string]struct{}
+
+	comments nodeComments
+}
+
+type nodeComments struct {
+	commentsAbove        []*parse.CommentNode
+	commentBeside        *parse.CommentNode
+	commentsBesideMerged bool
+}
+
+var newline = &parse.NewlineNode{}
+
+func (nc *nodeComments) attachCommentsAbove(cs []*parse.CommentNode) {
+	nc.commentsAbove = append(nc.commentsAbove, cs...)
+}
+
+func (nc *nodeComments) attachCommentBeside(c *parse.CommentNode) {
+	if nc.commentBeside == nil && !nc.commentsBesideMerged {
+		nc.commentBeside = c
+		return
+	}
+	if nc.commentBeside != nil {
+		nc.commentsAbove = append(nc.commentsAbove, nc.commentBeside, c)
+		nc.commentBeside = nil
+		nc.commentsBesideMerged = true
+		return
+	}
+	nc.commentsAbove = append(nc.commentsAbove, c)
+}
+
+type nodeWithComments struct {
+	n        parse.Node
+	comments nodeComments
 }
 
 type requireList struct {
 	m map[string]*require
 	// unrecognized semantic nodes
-	extraRequire []parse.Node
-	extraUse     []parse.Node
+	extraRequire []*nodeWithComments
+	extraUse     []*nodeWithComments
+
+	commentsBelow []*parse.CommentNode
 }
 
 func newRequireList() *requireList {
 	return &requireList{m: make(map[string]*require)}
 }
 
-func (rl *requireList) merge(r *require) {
+func (rl *requireList) merge(r *require) *require {
 	r2, ok := rl.m[r.name]
 	if !ok {
 		rl.m[r.name] = r
-		return
+		return r
 	}
 	if r.as != nil {
 		if r2.as == nil {
@@ -48,11 +83,11 @@ func (rl *requireList) merge(r *require) {
 		panic("merge arg has non-nil refer")
 	}
 	if len(r.origRefer) == 0 {
-		return
+		return r2
 	}
 	if r2.origRefer == nil && r2.refer == nil {
 		r2.origRefer = r.origRefer
-		return
+		return r2
 	}
 	if r2.origRefer != nil {
 		r2.refer = make(map[string]struct{})
@@ -72,34 +107,46 @@ func (rl *requireList) merge(r *require) {
 		}
 		r2.refer[n.Val] = struct{}{}
 	}
+	return r2
 }
 
-func (rl *requireList) parseRequire(n *parse.ListNode) {
+func (rl *requireList) parseRequireUse(n *parse.ListNode, use bool) {
+	var (
+		parseFn           = parseRequire
+		extra             = &rl.extraRequire
+		prevComments      *nodeComments
+		lineComments      []*parse.CommentNode
+		afterSemanticNode = false
+	)
+	if use {
+		parseFn = parseUse
+		extra = &rl.extraUse
+	}
 	for _, node := range n.Children()[1:] {
-		switch node.(type) {
-		case *parse.CommentNode, *parse.NewlineNode:
-		default:
-			if r, ok := parseRequire(node); ok {
-				rl.merge(r)
+		switch node := node.(type) {
+		case *parse.CommentNode:
+			if afterSemanticNode {
+				prevComments.attachCommentBeside(node)
 			} else {
-				rl.extraRequire = append(rl.extraRequire, node)
+				lineComments = append(lineComments, node)
 			}
+		case *parse.NewlineNode:
+			afterSemanticNode = false
+		default:
+			if r, ok := parseFn(node); ok {
+				r2 := rl.merge(r)
+				prevComments = &r2.comments
+			} else {
+				nc := &nodeWithComments{n: node}
+				*extra = append(*extra, nc)
+				prevComments = &nc.comments
+			}
+			prevComments.attachCommentsAbove(lineComments)
+			afterSemanticNode = true
+			lineComments = nil
 		}
 	}
-}
-
-func (rl *requireList) parseUse(n *parse.ListNode) {
-	for _, node := range n.Children()[1:] {
-		switch node.(type) {
-		case *parse.CommentNode, *parse.NewlineNode:
-		default:
-			if r, ok := parseUse(node); ok {
-				rl.merge(r)
-			} else {
-				rl.extraUse = append(rl.extraUse, node)
-			}
-		}
-	}
+	rl.commentsBelow = append(rl.commentsBelow, lineComments...)
 }
 
 func (rl *requireList) render() []parse.Node {
@@ -107,6 +154,9 @@ func (rl *requireList) render() []parse.Node {
 		&parse.KeywordNode{Val: ":require"},
 	}
 	for _, r := range rl.m {
+		for _, c := range r.comments.commentsAbove {
+			nodes = append(nodes, c, newline)
+		}
 		parts := []parse.Node{&parse.SymbolNode{Val: r.name}}
 		as := sortStringSet(r.as)
 		// If there are multiple :as definitions, emit a separate
@@ -119,7 +169,7 @@ func (rl *requireList) render() []parse.Node {
 					&parse.SymbolNode{Val: as[0]},
 				},
 			}
-			nodes = append(nodes, n, &parse.NewlineNode{})
+			nodes = append(nodes, n, newline)
 			as = as[1:]
 		}
 		if len(as) > 0 {
@@ -145,25 +195,47 @@ func (rl *requireList) render() []parse.Node {
 				&parse.KeywordNode{Val: ":refer"},
 				&parse.VectorNode{Nodes: refs})
 		}
-		n := &parse.VectorNode{Nodes: parts}
-		nodes = append(nodes, n, &parse.NewlineNode{})
+		nodes = append(nodes, &parse.VectorNode{Nodes: parts})
+		if r.comments.commentBeside != nil {
+			nodes = append(nodes, r.comments.commentBeside)
+		}
+		nodes = append(nodes, newline)
 	}
-	nodes = append(nodes, rl.extraRequire...)
+	for _, r := range rl.extraRequire {
+		for _, c := range r.comments.commentsAbove {
+			nodes = append(nodes, c, newline)
+		}
+		nodes = append(nodes, r.n)
+		if r.comments.commentBeside != nil {
+			nodes = append(nodes, r.comments.commentBeside)
+		}
+		nodes = append(nodes, newline)
+	}
+	for _, c := range rl.commentsBelow {
+		nodes = append(nodes, c, newline)
+	}
 
 	list := []parse.Node{
 		&parse.ListNode{Nodes: nodes},
-		&parse.NewlineNode{},
+		newline,
 	}
 	if len(rl.extraUse) > 0 {
 		extra := []parse.Node{
 			&parse.KeywordNode{Val: ":use"},
 		}
 		for _, n := range rl.extraUse {
-			extra = append(extra, n, &parse.NewlineNode{})
+			for _, c := range n.comments.commentsAbove {
+				extra = append(extra, c, newline)
+			}
+			extra = append(extra, n.n)
+			if n.comments.commentBeside != nil {
+				extra = append(extra, n.comments.commentBeside)
+			}
+			extra = append(extra, newline)
 		}
 		list = append(list,
 			&parse.ListNode{Nodes: extra},
-			&parse.NewlineNode{},
+			newline,
 		)
 	}
 	return list
