@@ -5,7 +5,6 @@ import (
 
 	"github.com/cespare/goclj"
 	"github.com/cespare/goclj/parse"
-	"github.com/kr/pretty"
 )
 
 type require struct {
@@ -27,7 +26,6 @@ func newRequireList() *requireList {
 }
 
 func (rl *requireList) merge(r *require) {
-	pretty.Println(r)
 	r2, ok := rl.m[r.name]
 	if !ok {
 		rl.m[r.name] = r
