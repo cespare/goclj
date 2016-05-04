@@ -1,21 +1,17 @@
 # goclj
 
-Go tools for working with Clojure code.
+> Go tools for working with Clojure code.
 
 The parse ([GoDoc](http://godoc.org/github.com/cespare/goclj/parse)) and format
 ([GoDoc](http://godoc.org/github.com/cespare/goclj/format)) packages implement
 Clojure code parsing and (formatted) printing, respectively.
 
 cljfmt is a command-line tool (inspired by gofmt) that uses format to read and
-reformat Clojure code. Because it parses the code, its transformations are
-entirely safe (they cannot change semantics). It takes care of normalizing
-code formatting according to Clojure conventions, including:
+reformat Clojure code. Because it parses the code, its formatting
+transformations are safe (they cannot change semantics).
 
-- Applying standard indentation rules
-- Removing trailing whitespace
-- Normalizing spacing between elements
-- Moving dangling close parens to the same line
-- Sorting imports and requires
+Additionally, cljfmt applies various transformations to the code; these are
+discussed in the **Transforms** section, below.
 
 To install or update, use `go get -u github.com/cespare/goclj/cljfmt`. Here is
 the output of `cljfmt -h`:
@@ -27,20 +23,91 @@ cljfmt reads from standard input.
 
 Flags:
   -c value
-        path to config file (default /Users/caleb/.cljfmt)
+        path to config file (default /home/caleb/.cljfmt)
+  -disable-transform value
+        turn off the named transform (default none)
+  -enable-transform value
+        turn on the named transform (default none)
   -l    print files whose formatting differs from cljfmt's
   -w    write result to (source) file instead of stdout
+
+See the goclj README for more documentation of the available transforms.
 ```
+
+## Transforms
+
+Cljfmt can perform many different transformations on the parsed tree before
+emitting formatted code. These vary in how aggressive they are and whether they
+introduce the possibility of "false positives"; i.e., unwanted changes to
+code semantics. The default transformations are very safe. The non-default ones
+can be enabled with the `-enable-transform` command-line flag; after running one
+of these transformations, you should verify that the code did not break in some
+way (typically by running tests).
+
+### sort-import-require (default: on)
+
+Sort :import and :require declarations in ns blocks.
+
+
+### remove-trailing-newlines (default: on)
+
+Remove extra newlines following sequence-like forms, so that parentheses are written on the same
+line. For example,
+
+    (foo bar
+     )
+
+becomes
+
+    (foo bar)
+
+### fix-defn-arglist-newline (default: on)
+
+Move the arg vector of defns to the same line, if appropriate:
+
+    (defn foo
+      [x] ...)
+
+becomes
+
+    (defn foo [x]
+      ...)
+
+if there's no newline after the arg list.
+
+### fix-defmethod-dispatch-val-newline (default: on)
+
+Move the dispatch-val of a defmethod to the same line, so that
+
+    (defmethod foo
+      :bar
+      [x] ...)
+
+becomes
+
+    (defmethod foo :bar
+      [x] ...)
+
+### remove-extra-blank-lines (default: on)
+
+Consolidate consecutive blank lines into a single blank line.
+
+### use-to-require (default: off)
+
+Consolidate `:require` and `:use` blocks inside ns declarations, rewriting them
+using `:require` if possible.
+
+## Cljfmt configuration
 
 You can optionally use a config file at `$HOME/.cljfmt` (override with `-c`).
 This is a Clojure file containing a single map of options. Here's an example:
 
 ```
-{:indent-overrides (; Compojure
+{:indent-overrides [; Compojure
                     ["GET" "POST" "PUT" "PATCH" "DELETE" "context"] :list-body
                     ; Korma
-                    ["select" "insert" "update" "delete"] :list-body)
- :thread-first-overrides ("-?>" :normal)}
+                    ["select" "insert" "update" "delete"] :list-body]
+ :thread-first-overrides ["-?>" :normal]}
 ```
 
 The configuration map may use the following keys:
