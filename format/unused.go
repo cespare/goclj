@@ -8,12 +8,14 @@ import (
 )
 
 type symbolCache struct {
+	imports  map[string]struct{} // packages appearing in :imports
 	symbols  map[string]struct{} // symbols without a / in them; e.g., foo
 	prefixes map[string]struct{} // symbol prefixes; e.g., a/foo -> a
 }
 
 func findSymbols(roots []parse.Node) *symbolCache {
 	syms := &symbolCache{
+		imports:  make(map[string]struct{}),
 		symbols:  make(map[string]struct{}),
 		prefixes: make(map[string]struct{}),
 	}
@@ -39,11 +41,35 @@ func findSymbols(roots []parse.Node) *symbolCache {
 		}
 	}
 	for _, root := range roots {
-		if !goclj.FnFormSymbol(root, "ns") {
+		if goclj.FnFormSymbol(root, "ns") {
+			for _, n := range root.Children()[1:] {
+				if goclj.FnFormKeyword(n, ":import") {
+					for _, n1 := range n.Children()[1:] {
+						syms.findImports(n1)
+					}
+				}
+			}
+		} else {
 			find(root)
 		}
 	}
 	return syms
+}
+
+func (sc *symbolCache) findImports(n parse.Node) {
+	switch n := n.(type) {
+	case *parse.SymbolNode:
+		if i := strings.LastIndexByte(n.Val, '.'); i >= 0 {
+			sc.imports[n.Val[:i]] = struct{}{}
+		}
+	case *parse.ListNode, *parse.VectorNode:
+		nodes := n.Children()
+		if len(nodes) > 0 {
+			if sym, ok := nodes[0].(*parse.SymbolNode); ok {
+				sc.imports[sym.Val] = struct{}{}
+			}
+		}
+	}
 }
 
 func (sc *symbolCache) hasSym(name string) bool {
@@ -53,6 +79,12 @@ func (sc *symbolCache) hasSym(name string) bool {
 
 func (sc *symbolCache) hasAs(name string) bool {
 	_, ok := sc.prefixes[name]
+	return ok
+}
+
+func (sc *symbolCache) hasRequireAsImport(name string) bool {
+	name = strings.Replace(name, "-", "_", -1)
+	_, ok := sc.imports[name]
 	return ok
 }
 
@@ -90,5 +122,6 @@ func (sc *symbolCache) unused(r *require) bool {
 	}
 	return len(r.as) == 0 &&
 		!r.referAll &&
-		r.origRefer == nil && len(r.refer) == 0
+		r.origRefer == nil && len(r.refer) == 0 &&
+		!sc.hasRequireAsImport(r.name)
 }
