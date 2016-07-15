@@ -42,6 +42,7 @@ func TestIssue7(t *testing.T)  { testChange(t, "issue7_before.clj", "issue7_afte
 func TestIssue25(t *testing.T) { testChange(t, "issue25_before.clj", "issue25_after.clj") }
 func TestIssue26(t *testing.T) { testChange(t, "issue26_before.clj", "issue26_after.clj") }
 func TestIssue32(t *testing.T) { testChange(t, "issue32_before.clj", "issue32_after.clj") }
+func TestIssue37(t *testing.T) { testChange(t, "issue37_before.clj", "issue37_after.clj") }
 
 func TestTransformsUseToRequire(t *testing.T) {
 	testChangeTransforms(

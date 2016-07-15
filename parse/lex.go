@@ -340,7 +340,7 @@ afterSingles:
 }
 
 func lexWhitespace(l *lexer) stateFn {
-	l.scanWhile(isWhitespace)
+	l.scanWhile(isWhitespaceNotNL)
 	l.skip()
 	return lexOuter
 }
@@ -454,6 +454,10 @@ func lexSymbol(l *lexer) stateFn {
 
 func isWhitespace(r rune) bool {
 	return unicode.IsSpace(r) || r == ','
+}
+
+func isWhitespaceNotNL(r rune) bool {
+	return r != '\n' && isWhitespace(r)
 }
 
 // isSymbolChar reports whether r is allowable in a Clojure symbol.

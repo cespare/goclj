@@ -82,12 +82,40 @@ func TestCommentCarriageReturn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error parsing %q: %s", input, err)
 	}
-	got := make([]string, len(tree.Roots))
-	for i, node := range tree.Roots {
-		got[i] = node.String()
-	}
+	got := tree.flatStrings()
 	want := []string{"num(3)", `comment(";a")`, "num(4)"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("for %q, got %v; want %v", input, got, want)
 	}
+}
+
+// Issue 37.
+func TestInternalNewlines(t *testing.T) {
+	const input = "[3\n4]"
+	tree, err := Reader(strings.NewReader(input), "temp", IncludeNonSemantic)
+	if err != nil {
+		t.Fatalf("error parsing %q: %s", input, err)
+	}
+	got := tree.flatStrings()
+	want := []string{"vector(length=2)", "num(3)", "newline", "num(4)"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("for %q, got %v; want %v", input, got, want)
+	}
+}
+
+// flatStrings gives a flattened string representation of t by calling String on
+// each node in the tree in a depth-first traversal.
+func (t *Tree) flatStrings() []string {
+	var nodes []string
+	var visit func(n Node)
+	visit = func(n Node) {
+		nodes = append(nodes, n.String())
+		for _, child := range n.Children() {
+			visit(child)
+		}
+	}
+	for _, root := range t.Roots {
+		visit(root)
+	}
+	return nodes
 }
