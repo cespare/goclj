@@ -37,10 +37,10 @@ func nodesToString(nodes []Node, depth int) string {
 	return buf.String()
 }
 
-func (t *Tree) Parse() (err error) {
+func (t *Tree) parse() (err error) {
 	defer t.recover(&err)
 	for {
-		node := t.parse()
+		node := t.parseNext()
 		if node == nil {
 			break
 		}
@@ -121,7 +121,7 @@ func Reader(r io.Reader, filename string, opts ParseOpts) (*Tree, error) {
 		includeNonSemantic: opts&IncludeNonSemantic != 0,
 		lex:                lex(filename, bufio.NewReader(r)),
 	}
-	if err := t.Parse(); err != nil {
+	if err := t.parse(); err != nil {
 		return nil, err
 	}
 	return t, nil
@@ -136,9 +136,9 @@ func File(filename string, opts ParseOpts) (*Tree, error) {
 	return Reader(f, filename, opts)
 }
 
-// parse parses the next top-level item from the token stream.
+// parseNext parses the next top-level item from the token stream.
 // It returns nil if there are no non-EOF tokens left in the stream.
-func (t *Tree) parse() Node {
+func (t *Tree) parseNext() Node {
 	for {
 		switch tok := t.next(); tok.typ {
 		case tokSymbol:
@@ -155,7 +155,7 @@ func (t *Tree) parse() Node {
 		case tokComment:
 			return &CommentNode{tok.pos, tok.val}
 		case tokAtSign:
-			return &DerefNode{tok.pos, t.parse()}
+			return &DerefNode{tok.pos, t.parseNext()}
 		case tokKeyword:
 			return &KeywordNode{tok.pos, tok.val}
 		case tokLeftParen:
@@ -170,21 +170,21 @@ func (t *Tree) parse() Node {
 			// TODO: need to parse the number here; a number token may not be valid.
 			return &NumberNode{tok.pos, tok.val}
 		case tokApostrophe:
-			return &QuoteNode{tok.pos, t.parse()}
+			return &QuoteNode{tok.pos, t.parseNext()}
 		case tokString:
 			return &StringNode{tok.pos, tok.val[1 : len(tok.val)-1]}
 		case tokBacktick:
-			return &SyntaxQuoteNode{tok.pos, t.parse()}
+			return &SyntaxQuoteNode{tok.pos, t.parseNext()}
 		case tokTilde:
 			next := t.next()
 			switch next.typ {
 			case tokAtSign:
-				return &UnquoteSpliceNode{tok.pos, t.parse()}
+				return &UnquoteSpliceNode{tok.pos, t.parseNext()}
 			case tokEOF:
 				t.unexpectedEOF(next)
 			}
 			t.backup()
-			return &UnquoteNode{tok.pos, t.parse()}
+			return &UnquoteNode{tok.pos, t.parseNext()}
 		case tokLeftBracket:
 			return t.parseVector(tok)
 		case tokDispatch:
@@ -255,7 +255,7 @@ func (t *Tree) parseList(start token) Node {
 			t.unexpectedEOF(tok)
 		}
 		t.backup()
-		node := t.parse()
+		node := t.parseNext()
 		if t.includeNonSemantic || isSemantic(node) {
 			nodes = append(nodes, node)
 		}
@@ -272,7 +272,7 @@ func (t *Tree) parseMap(start token) Node {
 			t.unexpectedEOF(tok)
 		}
 		t.backup()
-		node := t.parse()
+		node := t.parseNext()
 		if t.includeNonSemantic || isSemantic(node) {
 			nodes = append(nodes, node)
 		}
@@ -289,7 +289,7 @@ func (t *Tree) parseVector(start token) Node {
 			t.unexpectedEOF(tok)
 		}
 		t.backup()
-		node := t.parse()
+		node := t.parseNext()
 		if t.includeNonSemantic || isSemantic(node) {
 			nodes = append(nodes, node)
 		}
@@ -352,7 +352,7 @@ func (t *Tree) parseFnLiteral(start token) Node {
 			t.unexpectedEOF(tok)
 		}
 		t.backup()
-		node := t.parse()
+		node := t.parseNext()
 		if t.includeNonSemantic || isSemantic(node) {
 			nodes = append(nodes, node)
 		}
@@ -365,7 +365,7 @@ func (t *Tree) parseMetadata(start token) Node {
 		t.unexpectedEOF(tok)
 	}
 	t.backup()
-	return &MetadataNode{start.pos, t.parse()}
+	return &MetadataNode{start.pos, t.parseNext()}
 }
 
 func (t *Tree) parseReaderDiscard(start token) Node {
@@ -374,7 +374,7 @@ func (t *Tree) parseReaderDiscard(start token) Node {
 		t.unexpectedEOF(tok)
 	}
 	t.backup()
-	return &ReaderDiscardNode{start.pos, t.parse()}
+	return &ReaderDiscardNode{start.pos, t.parseNext()}
 }
 
 func (t *Tree) parseReaderEval(start token) Node {
@@ -383,7 +383,7 @@ func (t *Tree) parseReaderEval(start token) Node {
 		t.unexpectedEOF(tok)
 	}
 	t.backup()
-	return &ReaderEvalNode{start.pos, t.parse()}
+	return &ReaderEvalNode{start.pos, t.parseNext()}
 }
 
 func (t *Tree) parseRegex(start token) Node {
@@ -408,7 +408,7 @@ func (t *Tree) parseSet(start token) Node {
 			t.unexpectedEOF(tok)
 		}
 		t.backup()
-		node := t.parse()
+		node := t.parseNext()
 		if t.includeNonSemantic || isSemantic(node) {
 			nodes = append(nodes, node)
 		}
