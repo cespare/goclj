@@ -103,6 +103,27 @@ func TestInternalNewlines(t *testing.T) {
 	}
 }
 
+// Issue 48.
+func TestUnterminatedQuotes(t *testing.T) {
+	for _, input := range []string{"@", "'", "`", "~", "~@"} {
+		_, err := Reader(strings.NewReader(input), "temp", IncludeNonSemantic)
+		if !strings.HasSuffix(err.Error(), "unexpected EOF") {
+			t.Errorf("for %q, got err=%v; want unexpected EOF", input, err)
+		}
+	}
+
+	const input = "';hello\na"
+	tree, err := Reader(strings.NewReader(input), "temp", IncludeNonSemantic)
+	if err != nil {
+		t.Fatalf("error parsing %q: %s", input, err)
+	}
+	got := tree.flatStrings()
+	want := []string{"quote", "sym(a)"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("for %q: got %v; want %v", input, got, want)
+	}
+}
+
 // flatStrings gives a flattened string representation of t by calling String on
 // each node in the tree in a depth-first traversal.
 func (t *Tree) flatStrings() []string {

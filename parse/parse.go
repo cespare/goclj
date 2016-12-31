@@ -155,7 +155,7 @@ func (t *Tree) parseNext() Node {
 		case tokComment:
 			return &CommentNode{tok.pos, tok.val}
 		case tokAtSign:
-			return &DerefNode{tok.pos, t.parseNext()}
+			return &DerefNode{tok.pos, t.parseNextSemantic()}
 		case tokKeyword:
 			return &KeywordNode{tok.pos, tok.val}
 		case tokLeftParen:
@@ -170,21 +170,21 @@ func (t *Tree) parseNext() Node {
 			// TODO: need to parse the number here; a number token may not be valid.
 			return &NumberNode{tok.pos, tok.val}
 		case tokApostrophe:
-			return &QuoteNode{tok.pos, t.parseNext()}
+			return &QuoteNode{tok.pos, t.parseNextSemantic()}
 		case tokString:
 			return &StringNode{tok.pos, tok.val[1 : len(tok.val)-1]}
 		case tokBacktick:
-			return &SyntaxQuoteNode{tok.pos, t.parseNext()}
+			return &SyntaxQuoteNode{tok.pos, t.parseNextSemantic()}
 		case tokTilde:
 			next := t.next()
 			switch next.typ {
 			case tokAtSign:
-				return &UnquoteSpliceNode{tok.pos, t.parseNext()}
+				return &UnquoteSpliceNode{tok.pos, t.parseNextSemantic()}
 			case tokEOF:
 				t.unexpectedEOF(next)
 			}
 			t.backup()
-			return &UnquoteNode{tok.pos, t.parseNext()}
+			return &UnquoteNode{tok.pos, t.parseNextSemantic()}
 		case tokLeftBracket:
 			return t.parseVector(tok)
 		case tokDispatch:
@@ -197,6 +197,22 @@ func (t *Tree) parseNext() Node {
 			t.unexpected(tok)
 		}
 		panic("unreached")
+	}
+}
+
+// parseNextSemantic parses the next top-level semantically meaningful item from
+// the token stream. It expects that such an item exists; if it reaches EOF
+// before such an item is found, it gives an unexpected EOF error.
+func (t *Tree) parseNextSemantic() Node {
+	for {
+		if next := t.next(); next.typ == tokEOF {
+			t.unexpectedEOF(next)
+		}
+		t.backup()
+		n := t.parseNext()
+		if isSemantic(n) {
+			return n
+		}
 	}
 }
 
