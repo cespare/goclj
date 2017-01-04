@@ -18,24 +18,28 @@ func (p *Printer) markThreadFirsts(n parse.Node) {
 }
 
 func (p *Printer) markThreadFirstStyle(form *parse.ListNode, style ThreadFirstStyle) {
-	i := 2
+	begin := 2
 	if _, ok := p.threadFirst[form]; ok {
-		i = 1 // nested thread-first forms
+		begin = 1 // nested thread-first forms
 	}
-	condArrowFirst := true
-	for ; i < len(form.Nodes); i++ {
-		n, ok := form.Nodes[i].(*parse.ListNode)
-		if !ok {
+	idxSemantic := 0
+	for _, node := range form.Nodes {
+		switch n := node.(type) {
+		case *parse.CommentNode, *parse.NewlineNode:
 			continue
-		}
-		switch style {
-		case ThreadFirstNormal:
-			p.threadFirst[n] = struct{}{}
-		case ThreadFirstCondArrow:
-			if !condArrowFirst {
-				p.threadFirst[n] = struct{}{}
+		case *parse.ListNode:
+			if idxSemantic >= begin {
+				switch style {
+				case ThreadFirstNormal:
+					p.threadFirst[n] = struct{}{}
+				case ThreadFirstCondArrow:
+					if (begin-idxSemantic)&1 > 0 {
+						// Only apply to the second of a pair.
+						p.threadFirst[n] = struct{}{}
+					}
+				}
 			}
 		}
-		condArrowFirst = !condArrowFirst
+		idxSemantic++
 	}
 }
