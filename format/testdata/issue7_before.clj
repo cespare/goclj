@@ -3,7 +3,7 @@
   (:require [c :refer :all]
             [a]
             [b :as blah])
-  (:import a.b.c.Foo
+  (:import [a.b.c Bar]
+           a.b.c.Foo
            x.y.z.Foo
-           [a.b.c Bar]
            [x.y.z Bar Baz]))

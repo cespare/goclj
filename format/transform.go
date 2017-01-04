@@ -317,46 +317,35 @@ func (l importRequireList) Len() int      { return len(l) }
 func (l importRequireList) Swap(i, j int) { l[i], l[j] = l[j], l[i] }
 
 func (l importRequireList) Less(i, j int) bool {
-	// Some cases are nonsenical; don't particularly care how those are sorted.
-	n1, n2 := l[i].node, l[j].node
-	if s1, ok := n1.(*parse.SymbolNode); ok {
-		if s2, ok := n2.(*parse.SymbolNode); ok {
-			return s1.Val < s2.Val
+	// We only consider nodes comparable if they are symbols or
+	// lists/vectors with a symbol as a first child. Everything else
+	// compares as greater than one of these (and equal to one another).
+	k0, ok0 := getImportRequireSortKey(l[i].node)
+	k1, ok1 := getImportRequireSortKey(l[j].node)
+	if ok0 {
+		if ok1 {
+			return k0 < k1
 		}
-		if goclj.Vector(n2) {
-			return true // a < [b]
-		}
-		return true // a < 3
+		return true // valid < junk
 	}
-	if listOrVector(n1) {
-		if listOrVector(n2) {
-			children1, children2 := n1.Children(), n2.Children()
-			if len(children1) == 0 {
-				return true // [] < [a]
-			}
-			if len(children2) == 0 {
-				return false // [a] >= []
-			}
-			if p1, ok := children1[0].(*parse.SymbolNode); ok {
-				if p2, ok := children2[0].(*parse.SymbolNode); ok {
-					return p1.Val < p2.Val // [a] < [b]
-				}
-				return true // [a] < [3]
-			}
-			return false // [3] >= [a]
-		}
-		if _, ok := n2.(*parse.SymbolNode); ok {
-			return false // [a] >= b
-		}
-		return true // [a] < 3
-	}
-	return false // 3 >= 3
+	return false // junk == junk, junk > valid
 }
 
-func listOrVector(node parse.Node) bool {
-	switch node.(type) {
+func getImportRequireSortKey(n parse.Node) (key string, ok bool) {
+	switch n := n.(type) {
+	case *parse.SymbolNode:
+		return n.Val, true
 	case *parse.ListNode, *parse.VectorNode:
-		return true
+		children := n.Children()
+		if len(children) == 0 {
+			return "", false
+		}
+		sym, ok := children[0].(*parse.SymbolNode)
+		if !ok {
+			return "", false
+		}
+		return sym.Val, true
+	default:
+		return "", false
 	}
-	return false
 }
