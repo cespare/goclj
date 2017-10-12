@@ -39,6 +39,8 @@ func main() {
 	log.SetFlags(0)
 	log.SetPrefix("clfmt: ")
 	var configFile pathFlag
+	var wellFormatted bool = true
+	var err error
 	if home, ok := os.LookupEnv("HOME"); ok {
 		configFile.p = filepath.Join(home, ".cljfmt")
 	}
@@ -64,9 +66,14 @@ func main() {
 			log.Fatal("cannot use -w with standard input")
 		}
 		conf.list = false
-		if err := conf.processFile("<stdin>", os.Stdin); err != nil {
+		if err, wellFormatted = conf.processFile("<stdin>", os.Stdin); err != nil {
 			log.Fatal(err)
 		}
+
+		if !wellFormatted {
+			os.Exit(1)
+		}
+
 		return
 	}
 
@@ -76,12 +83,15 @@ func main() {
 			log.Fatal(err)
 		}
 		if stat.IsDir() {
-			conf.walkDir(path)
+			wellFormatted = conf.walkDir(path)
 			continue
 		}
-		if err := conf.processFile(path, nil); err != nil {
+		if err, wellFormatted = conf.processFile(path, nil); err != nil {
 			log.Fatal(err)
 		}
+	}
+	if !wellFormatted {
+		os.Exit(1)
 	}
 }
 
@@ -157,17 +167,19 @@ var (
 
 // processFile formats the given file.
 // If in == nil, the input is the file of the given name.
-func (c *config) processFile(filename string, in io.Reader) error {
+func (c *config) processFile(filename string, in io.Reader) (error, bool) {
 	var perm os.FileMode = 0644
+	var wellFormatted bool = true
+
 	if in == nil {
 		f, err := os.Open(filename)
 		if err != nil {
-			return err
+			return err, false
 		}
 		defer f.Close()
 		stat, err := f.Stat()
 		if err != nil {
-			return err
+			return err, false
 		}
 		perm = stat.Mode().Perm()
 		in = f
@@ -177,12 +189,12 @@ func (c *config) processFile(filename string, in io.Reader) error {
 	buf2.Reset()
 
 	if _, err := io.Copy(&buf1, in); err != nil {
-		return err
+		return err, false
 	}
 	r := bytes.NewReader(buf1.Bytes())
 	t, err := parse.Reader(r, filename, parse.IncludeNonSemantic)
 	if err != nil {
-		return err
+		return err, false
 	}
 
 	p := format.NewPrinter(&buf2)
@@ -190,25 +202,29 @@ func (c *config) processFile(filename string, in io.Reader) error {
 	p.IndentOverrides = c.indentOverrides
 	p.Transforms = c.transforms
 	if err := p.PrintTree(t); err != nil {
-		return err
+		return err, false
 	}
-	if !bytes.Equal(buf1.Bytes(), buf2.Bytes()) {
+	if wellFormatted = bytes.Equal(buf1.Bytes(), buf2.Bytes()); !wellFormatted {
 		if c.list {
 			fmt.Println(filename)
 		}
 		if c.write {
 			if err := ioutil.WriteFile(filename, buf2.Bytes(), perm); err != nil {
-				return err
+				return err, wellFormatted
 			}
 		}
 	}
 	if !c.list && !c.write {
 		io.Copy(os.Stdout, &buf2)
 	}
-	return nil
+
+	return nil, wellFormatted
 }
 
-func (c *config) walkDir(path string) {
+func (c *config) walkDir(path string) bool {
+
+	var dirWellFormatted bool = true
+
 	walk := func(path string, f os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -221,9 +237,15 @@ func (c *config) walkDir(path string) {
 			!strings.HasSuffix(name, ".clj") {
 			return nil
 		}
-		return c.processFile(path, nil)
+
+		err, wellFormatted := c.processFile(path, nil)
+		dirWellFormatted = dirWellFormatted && wellFormatted
+		return err
 	}
+
 	if err := filepath.Walk(path, walk); err != nil {
 		log.Fatal(err)
 	}
+
+	return dirWellFormatted
 }
