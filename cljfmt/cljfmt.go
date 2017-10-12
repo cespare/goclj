@@ -218,7 +218,9 @@ func (c *config) walkDir(path string) {
 		}
 		name := f.Name()
 		if strings.HasPrefix(name, ".") ||
-			!strings.HasSuffix(name, ".clj") {
+			!strings.HasSuffix(name, ".clj") &&
+				!strings.HasSuffix(name, ".cljs") &&
+				!strings.HasSuffix(name, ".cljc") {
 			return nil
 		}
 		return c.processFile(path, nil)
