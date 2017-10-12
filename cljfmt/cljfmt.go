@@ -217,13 +217,15 @@ func (c *config) walkDir(path string) {
 			return nil
 		}
 		name := f.Name()
-		if strings.HasPrefix(name, ".") ||
-			!strings.HasSuffix(name, ".clj") &&
-				!strings.HasSuffix(name, ".cljs") &&
-				!strings.HasSuffix(name, ".cljc") {
+		if strings.HasPrefix(name, ".") {
 			return nil
 		}
-		return c.processFile(path, nil)
+		for _, ext := range []string{".clj", ".cljs", ".cljc"} {
+			if strings.HasSuffix(name, ext) {
+				return c.processFile(path, nil)
+			}
+		}
+		return nil // not a Clojure file
 	}
 	if err := filepath.Walk(path, walk); err != nil {
 		log.Fatal(err)
