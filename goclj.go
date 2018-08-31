@@ -80,7 +80,7 @@ func Comment(node parse.Node) bool {
 // It might have to be adjusted if used for other purposes.
 func Semantic(node parse.Node) bool {
 	switch node.(type) {
-	case *parse.NewlineNode, *parse.CommentNode, *parse.MetadataNode:
+	case *parse.NewlineNode, *parse.CommentNode, *parse.MetadataNode, *parse.TagNode:
 		return false
 	}
 	return true
