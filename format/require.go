@@ -311,7 +311,7 @@ func parseRequireSeq(nodes []parse.Node) (r *require, ok bool) {
 		}
 	}
 	if as != "" {
-		r.as = map[string]struct{}{as: struct{}{}}
+		r.as = map[string]struct{}{as: {}}
 	}
 	r.origRefer = refer
 	return r, true
@@ -347,7 +347,7 @@ func parseUseSeq(nodes []parse.Node) (r *require, ok bool) {
 			if !ok {
 				return nil, false
 			}
-			r.as = map[string]struct{}{n.Val: struct{}{}}
+			r.as = map[string]struct{}{n.Val: {}}
 		case ":only":
 			switch nodes[2].(type) {
 			case *parse.ListNode, *parse.VectorNode:
