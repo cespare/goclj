@@ -404,6 +404,10 @@ func lexDispatch(l *lexer) stateFn {
 	// will be repeated in the following token. (for instance, "#{1}" will
 	// be tokenized as "#{", "{", "1", "}".
 	//
+	// Reader conditionals -- #?(...) Or #?@(...) -- are handled the same
+	// way except that the dispatch token will not include the (; it will be
+	// either "#?" or "#?@".
+	//
 	// Otherwise, the dispatch token is two chars and the following token is
 	// distinct.
 	r, eof := l.next()
@@ -415,6 +419,20 @@ func lexDispatch(l *lexer) stateFn {
 	switch r {
 	case '{', '(', '"':
 		l.back()
+		l.skip()
+		l.synth(tokDispatch, val)
+		return lexOuter
+	case '?':
+		// Check whether we have #?(...) or #?@(...).
+		r, eof = l.next()
+		if eof {
+			l.synth(tokDispatch, val)
+			return nil
+		}
+		if r != '@' {
+			l.back()
+		}
+		val = string(l.val)
 		l.skip()
 		l.synth(tokDispatch, val)
 		return lexOuter
