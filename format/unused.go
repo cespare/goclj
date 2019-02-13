@@ -27,17 +27,31 @@ func findSymbols(roots []parse.Node) *symbolCache {
 			name = n.Val
 		case *parse.VarQuoteNode:
 			name = n.Val
-		default:
-			for _, child := range n.Children() {
-				find(child)
+		case *parse.KeywordNode:
+			// Handle auto-resolving keywords of the form ::ns/sym.
+			if ns, ok := trimPrefix(n.Val, "::"); ok {
+				if i := strings.IndexRune(ns, '/'); i >= 0 {
+					syms.namespaces[ns[:i]] = struct{}{}
+				}
 			}
-			return
+		case *parse.MapNode:
+			// Handle auto-resolving namespaced maps of the form
+			// #::ns{...}.
+			if ns, ok := trimPrefix(n.Namespace, "::"); ok {
+				if ns != "" {
+					syms.namespaces[ns] = struct{}{}
+				}
+			}
 		}
-		i := strings.IndexRune(name, '/')
-		if i < 0 {
-			syms.symbols[name] = struct{}{}
-		} else {
-			syms.namespaces[name[:i]] = struct{}{}
+		if name != "" {
+			if i := strings.IndexRune(name, '/'); i < 0 {
+				syms.symbols[name] = struct{}{}
+			} else {
+				syms.namespaces[name[:i]] = struct{}{}
+			}
+		}
+		for _, child := range n.Children() {
+			find(child)
 		}
 	}
 	for _, root := range roots {
@@ -54,6 +68,11 @@ func findSymbols(roots []parse.Node) *symbolCache {
 		}
 	}
 	return syms
+}
+
+func trimPrefix(s, prefix string) (string, bool) {
+	result := strings.TrimPrefix(s, prefix)
+	return result, result != s
 }
 
 func (sc *symbolCache) findImports(n parse.Node) {
