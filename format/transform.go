@@ -121,9 +121,9 @@ func useToRequire(ns parse.Node) {
 		}
 		prevSkipped = false
 		if goclj.FnFormKeyword(n, ":require", ":use") {
-			ln := n.(*parse.ListNode)
-			name := ln.Nodes[0].(*parse.KeywordNode).Val
-			rl.parseRequireUse(ln, name == ":use")
+			children := n.Children()
+			name := children[0].(*parse.KeywordNode).Val
+			rl.parseRequireUse(children, name == ":use")
 			if insertIndex == -1 {
 				insertIndex = i + 1
 			}
@@ -148,7 +148,7 @@ func removeUnusedRequires(ns parse.Node, syms *symbolCache) {
 			continue
 		}
 		rl := newRequireList()
-		rl.parseRequireUse(n.(*parse.ListNode), false)
+		rl.parseRequireUse(n.Children(), false)
 		for name, r := range rl.m {
 			if syms.unused(r) {
 				delete(rl.m, name)

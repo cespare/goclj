@@ -34,6 +34,12 @@ type Printer struct {
 	specialIndent     map[parse.Node]IndentStyle
 	threadFirst       map[*parse.ListNode]struct{}
 	docstrings        map[*parse.StringNode]struct{}
+
+	// The requires and refers maps track all the require aliases and
+	// referred names.
+	// Example: given the require [x :as y :refer [z]]:
+	requires map[string]string // y -> x
+	refers   map[string]string // z -> x
 }
 
 // NewPrinter creates a printer to the given writer.
@@ -44,6 +50,8 @@ func NewPrinter(w io.Writer) *Printer {
 		specialIndent: make(map[parse.Node]IndentStyle),
 		threadFirst:   make(map[*parse.ListNode]struct{}),
 		docstrings:    make(map[*parse.StringNode]struct{}),
+		requires:      make(map[string]string),
+		refers:        make(map[string]string),
 	}
 }
 
@@ -88,6 +96,7 @@ func (p *Printer) PrintTree(t *parse.Tree) (err error) {
 	for _, node := range t.Roots {
 		p.markDocstrings(node)
 		p.markThreadFirsts(node)
+		p.markRequires(node)
 	}
 	p.printSequence(t.Roots, 0, IndentNormal)
 	return p.bw.Flush()
@@ -220,7 +229,7 @@ func (p *Printer) applySpecialIndentRules(node *parse.ListNode) {
 	if !ok {
 		return
 	}
-	if style, ok := p.indentStyles[symbolName(s.Val)]; ok {
+	if style, ok := p.indentStyleForSymbol(s.Val); ok {
 		switch style {
 		case IndentLet:
 			p.applySpecialLet(node.Nodes)
@@ -283,16 +292,40 @@ func (p *Printer) chooseIndent(nodes []parse.Node) IndentStyle {
 }
 
 func (p *Printer) chooseListIndent(name string) IndentStyle {
-	name = symbolName(name)
-	if style, ok := p.indentStyles[name]; ok {
+	if style, ok := p.indentStyleForSymbol(name); ok {
 		return style
 	}
+	name = symbolName(name)
 	for _, prefix := range []string{"def", "let", "send-", "with-", "when-"} {
 		if strings.HasPrefix(name, prefix) {
 			return IndentListBody
 		}
 	}
 	return IndentList
+}
+
+func (p *Printer) indentStyleForSymbol(name string) (IndentStyle, bool) {
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		ns := name[:i]
+		unqualified := name[i+1:]
+		if req, ok := p.requires[ns]; ok {
+			if style, ok := p.indentStyles[req+"/"+unqualified]; ok {
+				return style, true
+			}
+		}
+		if style, ok := p.indentStyles[unqualified]; ok {
+			return style, true
+		}
+	} else {
+		if req, ok := p.refers[name]; ok {
+			if style, ok := p.indentStyles[req+"/"+name]; ok {
+				return style, true
+			}
+		}
+	}
+	// Fall back to any rule for the name as written.
+	style, ok := p.indentStyles[name]
+	return style, ok
 }
 
 func symbolName(sym string) string {
