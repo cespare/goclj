@@ -220,7 +220,7 @@ and `cond->>`.
 ```
 
 **:cond2** is like `:cond0` but it ignores the first two argument when counting
-parameters for indentation. By default `:cond1` is used for `condp`.
+parameters for indentation. By default `:cond2` is used for `condp`.
 
 ``` clojure
 (condp = value
@@ -229,6 +229,9 @@ parameters for indentation. By default `:cond1` is used for `condp`.
   2
     "two"
 ```
+
+**:cond4** is like `:cond0` but it ignores the first four argument when counting
+parameters for indentation.
 
 ### :thread-first-overrides
 
