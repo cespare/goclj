@@ -8,16 +8,16 @@ import (
 )
 
 type symbolCache struct {
-	imports  map[string]struct{} // packages appearing in :imports
-	symbols  map[string]struct{} // symbols without a / in them; e.g., foo
-	prefixes map[string]struct{} // symbol prefixes; e.g., a/foo -> a
+	imports    map[string]struct{} // packages appearing in :imports
+	symbols    map[string]struct{} // symbols without a / in them; e.g., foo
+	namespaces map[string]struct{} // symbol namespaces; e.g., a/foo -> a
 }
 
 func findSymbols(roots []parse.Node) *symbolCache {
 	syms := &symbolCache{
-		imports:  make(map[string]struct{}),
-		symbols:  make(map[string]struct{}),
-		prefixes: make(map[string]struct{}),
+		imports:    make(map[string]struct{}),
+		symbols:    make(map[string]struct{}),
+		namespaces: make(map[string]struct{}),
 	}
 	var find func(n parse.Node)
 	find = func(n parse.Node) {
@@ -37,7 +37,7 @@ func findSymbols(roots []parse.Node) *symbolCache {
 		if i < 0 {
 			syms.symbols[name] = struct{}{}
 		} else {
-			syms.prefixes[name[:i]] = struct{}{}
+			syms.namespaces[name[:i]] = struct{}{}
 		}
 	}
 	for _, root := range roots {
@@ -72,17 +72,17 @@ func (sc *symbolCache) findImports(n parse.Node) {
 	}
 }
 
-func (sc *symbolCache) hasSym(name string) bool {
+func (sc *symbolCache) usesSym(name string) bool {
 	_, ok := sc.symbols[name]
 	return ok
 }
 
-func (sc *symbolCache) hasAs(name string) bool {
-	_, ok := sc.prefixes[name]
+func (sc *symbolCache) usesNamespace(name string) bool {
+	_, ok := sc.namespaces[name]
 	return ok
 }
 
-func (sc *symbolCache) hasRequireAsImport(name string) bool {
+func (sc *symbolCache) usesRequireAsImport(name string) bool {
 	name = strings.Replace(name, "-", "_", -1)
 	_, ok := sc.imports[name]
 	return ok
@@ -91,13 +91,8 @@ func (sc *symbolCache) hasRequireAsImport(name string) bool {
 // unused removes unused :as and :refer aliases from r,
 // and also returns whether the require is no longer needed at all.
 func (sc *symbolCache) unused(r *require) bool {
-	if len(r.as) == 0 && r.origRefer == nil && len(r.refer) == 0 {
-		// For requires like [foo], which are presumably to load Java
-		// classes, don't try to figure out if they're used.
-		return false
-	}
 	for as := range r.as {
-		if !sc.hasAs(as) {
+		if !sc.usesNamespace(as) {
 			delete(r.as, as)
 		}
 	}
@@ -109,19 +104,20 @@ func (sc *symbolCache) unused(r *require) bool {
 			if !ok {
 				continue
 			}
-			if !sc.hasSym(n.Val) {
+			if !sc.usesSym(n.Val) {
 				r.extractOrigRefer()
 				break
 			}
 		}
 	}
 	for ref := range r.refer {
-		if !sc.hasSym(ref) {
+		if !sc.usesSym(ref) {
 			delete(r.refer, ref)
 		}
 	}
-	return len(r.as) == 0 &&
+	return !sc.usesNamespace(r.name) &&
+		!sc.usesRequireAsImport(r.name) &&
+		len(r.as) == 0 &&
 		!r.referAll &&
-		r.origRefer == nil && len(r.refer) == 0 &&
-		!sc.hasRequireAsImport(r.name)
+		r.origRefer == nil && len(r.refer) == 0
 }
