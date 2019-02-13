@@ -141,17 +141,23 @@ func useToRequire(ns parse.Node) {
 }
 
 func removeUnusedRequires(ns parse.Node, syms *symbolCache) {
-	nodes := ns.Children()
-	for i, n := range nodes {
-		if goclj.FnFormKeyword(n, ":require") {
-			rl := newRequireList()
-			rl.parseRequireUse(n.(*parse.ListNode), false)
-			for name, r := range rl.m {
-				if syms.unused(r) {
-					delete(rl.m, name)
-				}
+	nodes := ns.Children()[:0]
+	for _, n := range ns.Children() {
+		if !goclj.FnFormKeyword(n, ":require") {
+			nodes = append(nodes, n)
+			continue
+		}
+		rl := newRequireList()
+		rl.parseRequireUse(n.(*parse.ListNode), false)
+		for name, r := range rl.m {
+			if syms.unused(r) {
+				delete(rl.m, name)
 			}
-			nodes[i] = rl.render()[0]
+		}
+		requires := rl.render()[0]
+		// If all that's left is (:require), drop it.
+		if len(requires.Children()) > 1 {
+			nodes = append(nodes, requires)
 		}
 	}
 	ns.SetChildren(nodes)

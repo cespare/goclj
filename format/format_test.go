@@ -82,6 +82,15 @@ func TestTransformsRemoveUnusedRequires(t *testing.T) {
 	)
 }
 
+func TestTransformsRemoveUnusedRequiresEmpty(t *testing.T) {
+	testChangeTransforms(
+		t,
+		"transform/unusedrequiresempty_before.clj",
+		"transform/unusedrequiresempty_after.clj",
+		map[Transform]bool{TransformRemoveUnusedRequires: true},
+	)
+}
+
 func TestCustomIndent(t *testing.T) {
 	const file0 = "indent1.clj"
 	const file1 = "indent1_custom.clj"
@@ -124,11 +133,13 @@ func testChange(t *testing.T, before, after string) {
 }
 
 func testChangeTransforms(t *testing.T, before, after string, transforms map[Transform]bool) {
+	t.Helper()
 	f := func(p *Printer) { p.Transforms = transforms }
 	testChangeCustom(t, before, after, f)
 }
 
 func testChangeCustom(t *testing.T, before, after string, f func(p *Printer)) {
+	t.Helper()
 	tree := parseFile(t, before)
 	var buf bytes.Buffer
 	p := NewPrinter(&buf)
@@ -157,6 +168,7 @@ func readFile(t *testing.T, name string) []byte {
 }
 
 func check(t *testing.T, desc string, got, want []byte) {
+	t.Helper()
 	if !bytes.Equal(got, want) {
 		gotFormatted := formatLines(got)
 		wantFormatted := formatLines(want)
