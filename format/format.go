@@ -146,6 +146,10 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		w = p.printSequence(node.Nodes, w, style)
 		return w + p.WriteString(")")
 	case *parse.MapNode:
+		if node.Namespace != "" {
+			w += p.WriteString("#")
+			w += p.WriteString(node.Namespace)
+		}
 		w += p.WriteString("{")
 		w = p.printSequence(node.Nodes, w, indentBindings)
 		return w + p.WriteString("}")

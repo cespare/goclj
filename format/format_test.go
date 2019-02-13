@@ -15,6 +15,8 @@ func TestFixture(t *testing.T) {
 	for _, fixture := range []string{
 		"simple1",
 		"let",
+		"map",
+		"nsmap",
 		"deftype",
 		"listbody",
 		"threadfirst",

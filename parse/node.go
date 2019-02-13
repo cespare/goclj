@@ -81,12 +81,17 @@ func (n *ListNode) SetChildren(nodes []Node) { n.Nodes = nodes }
 
 type MapNode struct {
 	*Pos
-	Nodes []Node
+	Namespace string // empty unless the map has a namespace: #:ns{:x 1}
+	Nodes     []Node
 }
 
 func (n *MapNode) String() string {
+	var ns string
+	if n.Namespace != "" {
+		ns = fmt.Sprintf("ns=%s, ", n.Namespace)
+	}
 	semanticNodes := countSemantic(n.Nodes)
-	return fmt.Sprintf("map(length=%d)", semanticNodes/2)
+	return fmt.Sprintf("map(%slength=%d)", ns, semanticNodes/2)
 }
 func (n *MapNode) Children() []Node         { return n.Nodes }
 func (n *MapNode) SetChildren(nodes []Node) { n.Nodes = nodes }

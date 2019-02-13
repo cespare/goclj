@@ -385,6 +385,9 @@ func lexCharLiteral(l *lexer) stateFn {
 
 func lexKeyword(l *lexer) stateFn {
 	l.scanWhile(isSymbolChar)
+	if len(l.val) == 0 {
+		return l.errorf("empty keyword")
+	}
 	l.emit(tokKeyword)
 	return lexOuter
 }
@@ -408,6 +411,10 @@ func lexDispatch(l *lexer) stateFn {
 	// way except that the dispatch token will not include the (; it will be
 	// either "#?" or "#?@".
 	//
+	// A namespaced map literal has a dispatch token of "#:"; the namespace
+	// is emitted as a keyword token (including the leading :).
+	// So "#:foo{:bar 1}" is tokenized as "#:", ":foo", "{", "bar", 1, "}".
+	//
 	// Otherwise, the dispatch token is two chars and the following token is
 	// distinct.
 	r, eof := l.next()
@@ -418,9 +425,9 @@ func lexDispatch(l *lexer) stateFn {
 	val := string(l.val)
 	switch r {
 	case '{', '(', '"':
+		l.synth(tokDispatch, val)
 		l.back()
 		l.skip()
-		l.synth(tokDispatch, val)
 		return lexOuter
 	case '?':
 		// Check whether we have #?(...) or #?@(...).
@@ -436,9 +443,15 @@ func lexDispatch(l *lexer) stateFn {
 		l.skip()
 		l.synth(tokDispatch, val)
 		return lexOuter
-	case '\'', '_', '^', '=':
-		l.skip()
+	case ':':
 		l.synth(tokDispatch, val)
+		l.back()
+		l.skip()
+		l.next()
+		return lexKeyword
+	case '\'', '_', '^', '=':
+		l.synth(tokDispatch, val)
+		l.skip()
 		return lexOuter
 	case '!':
 		// #! is a reader dispatch macro for comments.
