@@ -216,7 +216,7 @@ func (t *Tree) parseNextSemantic() Node {
 	}
 }
 
-func (t *Tree) parseCharLiteral(tok token) Node {
+func (t *Tree) parseCharLiteral(tok token) *CharacterNode {
 	var r rune
 	val := tok.val[1:]
 	runes := []rune(val)
@@ -261,7 +261,7 @@ func (t *Tree) parseCharLiteral(tok token) Node {
 	return &CharacterNode{tok.pos, r, tok.val}
 }
 
-func (t *Tree) parseList(start token) Node {
+func (t *Tree) parseList(start token) *ListNode {
 	var nodes []Node
 	for {
 		switch tok := t.next(); tok.typ {
@@ -278,7 +278,7 @@ func (t *Tree) parseList(start token) Node {
 	}
 }
 
-func (t *Tree) parseMap(start token) Node {
+func (t *Tree) parseMap(start token) *MapNode {
 	var nodes []Node
 	for {
 		switch tok := t.next(); tok.typ {
@@ -295,7 +295,7 @@ func (t *Tree) parseMap(start token) Node {
 	}
 }
 
-func (t *Tree) parseVector(start token) Node {
+func (t *Tree) parseVector(start token) *VectorNode {
 	var nodes []Node
 	for {
 		switch tok := t.next(); tok.typ {
@@ -316,6 +316,8 @@ func (t *Tree) parseDispatch(tok token) Node {
 	switch tok.val {
 	case "#(":
 		return t.parseFnLiteral(tok)
+	case "#?", "#?@":
+		return t.parseReaderCond(tok)
 	case "#_":
 		return t.parseReaderDiscard(tok)
 	case "#=":
@@ -336,7 +338,7 @@ func (t *Tree) parseDispatch(tok token) Node {
 	panic("unreached")
 }
 
-func (t *Tree) parseTag(start token) Node {
+func (t *Tree) parseTag(start token) *TagNode {
 	tok := t.next()
 	switch tok.typ {
 	case tokSymbol:
@@ -349,7 +351,7 @@ func (t *Tree) parseTag(start token) Node {
 	panic("not reached")
 }
 
-func (t *Tree) parseFnLiteral(start token) Node {
+func (t *Tree) parseFnLiteral(start token) *FnLiteralNode {
 	if t.inLambda {
 		t.errorf(start.pos, "cannot nest fn literals")
 	}
@@ -375,7 +377,26 @@ func (t *Tree) parseFnLiteral(start token) Node {
 	}
 }
 
-func (t *Tree) parseMetadata(start token) Node {
+func (t *Tree) parseReaderCond(start token) Node {
+	tok := t.next()
+	if tok.typ == tokEOF {
+		t.unexpectedEOF(tok)
+	}
+	if tok.typ != tokLeftParen {
+		t.errorf(tok.pos, "reader conditional body must be a list")
+	}
+	list := t.parseList(tok)
+	switch start.val {
+	case "#?":
+		return &ReaderCondNode{start.pos, list.Nodes}
+	case "#?@":
+		return &ReaderCondSpliceNode{start.pos, list.Nodes}
+	default:
+		panic("should not happen")
+	}
+}
+
+func (t *Tree) parseMetadata(start token) *MetadataNode {
 	tok := t.next()
 	if tok.typ == tokEOF {
 		t.unexpectedEOF(tok)
@@ -384,7 +405,7 @@ func (t *Tree) parseMetadata(start token) Node {
 	return &MetadataNode{start.pos, t.parseNext()}
 }
 
-func (t *Tree) parseReaderDiscard(start token) Node {
+func (t *Tree) parseReaderDiscard(start token) *ReaderDiscardNode {
 	tok := t.next()
 	if tok.typ == tokEOF {
 		t.unexpectedEOF(tok)
@@ -393,7 +414,7 @@ func (t *Tree) parseReaderDiscard(start token) Node {
 	return &ReaderDiscardNode{start.pos, t.parseNext()}
 }
 
-func (t *Tree) parseReaderEval(start token) Node {
+func (t *Tree) parseReaderEval(start token) *ReaderEvalNode {
 	tok := t.next()
 	if tok.typ == tokEOF {
 		t.unexpectedEOF(tok)
@@ -402,7 +423,7 @@ func (t *Tree) parseReaderEval(start token) Node {
 	return &ReaderEvalNode{start.pos, t.parseNext()}
 }
 
-func (t *Tree) parseRegex(start token) Node {
+func (t *Tree) parseRegex(start token) *RegexNode {
 	tok := t.next()
 	if tok.typ != tokString {
 		panic("should not happen")
@@ -410,7 +431,7 @@ func (t *Tree) parseRegex(start token) Node {
 	return &RegexNode{start.pos, tok.val[1 : len(tok.val)-1]}
 }
 
-func (t *Tree) parseSet(start token) Node {
+func (t *Tree) parseSet(start token) *SetNode {
 	tok := t.next()
 	if tok.typ != tokLeftBrace {
 		panic("should not happen")
@@ -431,7 +452,7 @@ func (t *Tree) parseSet(start token) Node {
 	}
 }
 
-func (t *Tree) parseVarQuote(start token) Node {
+func (t *Tree) parseVarQuote(start token) *VarQuoteNode {
 	switch tok := t.next(); tok.typ {
 	case tokSymbol:
 		return &VarQuoteNode{start.pos, tok.val}

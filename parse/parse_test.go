@@ -27,6 +27,8 @@ var testCases = []struct {
 	{"'(foobar)", "quote"},
 	{`#"^asdf"`, `regex("^asdf")`},
 	{"#{1 2 3}", "set(length=3)"},
+	{"#?(:clj 1)", "reader-cond(length=2)"},
+	{"#?@(:clj :a :default :b)", "reader-cond-splice(length=4)"},
 	{`"foo"`, `string("foo")`},
 	{"`(1 2 3)", "syntax quote"},
 	{"#foo", "tag(foo)"},
@@ -55,11 +57,13 @@ func TestAll(t *testing.T) {
 			t.Fatalf("error parsing %q: %s", tc.s, err)
 		}
 		if len(tree.Roots) != 1 {
-			t.Fatalf("got %d roots for %q; want 1", len(tree.Roots), tc.s)
+			t.Errorf("got %d roots for %q; want 1", len(tree.Roots), tc.s)
+			continue
 		}
 		got := tree.Roots[0].String()
 		if got != tc.want {
-			t.Fatalf("for %q: got %s; want %s", tc.s, got, tc.want)
+			t.Errorf("for %q: got %s; want %s", tc.s, got, tc.want)
+			continue
 		}
 	}
 }

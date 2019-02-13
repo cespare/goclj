@@ -114,6 +114,14 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		w += p.WriteString("#(")
 		w = p.printSequence(node.Nodes, w, p.chooseIndent(node.Nodes))
 		return w + p.WriteString(")")
+	case *parse.ReaderCondNode:
+		w += p.WriteString("#?(")
+		w = p.printSequence(node.Nodes, w, indentBindings)
+		return w + p.WriteString(")")
+	case *parse.ReaderCondSpliceNode:
+		w += p.WriteString("#?@(")
+		w = p.printSequence(node.Nodes, w, indentBindings)
+		return w + p.WriteString(")")
 	case *parse.ReaderDiscardNode:
 		w += p.WriteString("#_")
 		return p.printNode(node.Node, w)

@@ -226,6 +226,28 @@ func (n *FnLiteralNode) String() string {
 func (n *FnLiteralNode) Children() []Node         { return n.Nodes }
 func (n *FnLiteralNode) SetChildren(nodes []Node) { n.Nodes = nodes }
 
+type ReaderCondNode struct {
+	*Pos
+	Nodes []Node
+}
+
+func (n *ReaderCondNode) String() string {
+	return fmt.Sprintf("reader-cond(length=%d)", len(n.Nodes))
+}
+func (n *ReaderCondNode) Children() []Node         { return n.Nodes }
+func (n *ReaderCondNode) SetChildren(nodes []Node) { n.Nodes = nodes }
+
+type ReaderCondSpliceNode struct {
+	*Pos
+	Nodes []Node
+}
+
+func (n *ReaderCondSpliceNode) String() string {
+	return fmt.Sprintf("reader-cond-splice(length=%d)", len(n.Nodes))
+}
+func (n *ReaderCondSpliceNode) Children() []Node         { return n.Nodes }
+func (n *ReaderCondSpliceNode) SetChildren(nodes []Node) { n.Nodes = nodes }
+
 type ReaderDiscardNode struct {
 	*Pos
 	Node Node

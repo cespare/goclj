@@ -20,6 +20,7 @@ func TestFixture(t *testing.T) {
 		"threadfirst",
 		"cond",
 		"indent",
+		"readercond",
 		"issue5",
 		"issue8",
 		"issue9",
