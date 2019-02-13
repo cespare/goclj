@@ -113,7 +113,10 @@ This is a Clojure file containing a single map of options. Here's an example:
 {:indent-overrides [; Compojure
                     ["GET" "POST" "PUT" "PATCH" "DELETE" "context"] :list-body
                     ; Korma
-                    ["select" "insert" "update" "delete"] :list-body]
+                    ["korma.core/select"
+                     "korma.core/insert"
+                     "korma.core/update"
+                     "korma.core/delete"] :list-body]
  :thread-first-overrides ["-?>" :normal]}
 ```
 
@@ -125,6 +128,17 @@ This is used to customize the indentation rules that cljfmt applies to
 particular functions and macros. The value is a sequence of pairs; the first
 element of each pair is either a string or sequence of strings; the second
 element of the pair is the indentation rule to apply to the given names.
+
+The names may be given with or without a qualifying namespace. If there is an
+indent-override for `foo`, it will apply to any list form starting with the
+symbol `foo` whether it's written as `foo` or `ns/foo`. If the indent-override
+is for `my.ns/foo`, then it only takes effect if:
+
+1. the symbol is written as `my.ns/foo`, or
+2. if the symbol is written as `a/foo` and there is a require containing
+   `[my.ns :as a]`, or
+3. the symbol is written as `foo` and there is a require containing
+   `[my.ns :refer [foo]]`.
 
 The allowed indentation rules are as follows:
 

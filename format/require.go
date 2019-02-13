@@ -7,6 +7,34 @@ import (
 	"github.com/cespare/goclj/parse"
 )
 
+func (p *Printer) markRequires(n parse.Node) {
+	if !goclj.FnFormSymbol(n, "ns") {
+		return
+	}
+	for _, n := range n.Children() {
+		if !goclj.FnFormKeyword(n, ":require") {
+			continue
+		}
+		for _, n := range n.Children()[1:] {
+			r := parseRequire(n)
+			if r == nil {
+				continue
+			}
+			for as := range r.as {
+				p.requires[as] = r.name
+			}
+			for _, n := range r.origRefer {
+				if n, ok := n.(*parse.SymbolNode); ok {
+					p.refers[n.Val] = r.name
+				}
+			}
+			for ref := range r.refer {
+				p.refers[ref] = r.name
+			}
+		}
+	}
+}
+
 type require struct {
 	name     string
 	as       map[string]struct{}
@@ -112,7 +140,7 @@ func (r *require) extractOrigRefer() {
 	r.origRefer = nil
 }
 
-func (rl *requireList) parseRequireUse(n *parse.ListNode, use bool) {
+func (rl *requireList) parseRequireUse(nodes []parse.Node, use bool) {
 	var (
 		parseFn           = parseRequire
 		extra             = &rl.extraRequire
@@ -124,7 +152,7 @@ func (rl *requireList) parseRequireUse(n *parse.ListNode, use bool) {
 		parseFn = parseUse
 		extra = &rl.extraUse
 	}
-	for _, node := range n.Children()[1:] {
+	for _, node := range nodes[1:] {
 		switch node := node.(type) {
 		case *parse.CommentNode:
 			if afterSemanticNode {
@@ -135,7 +163,7 @@ func (rl *requireList) parseRequireUse(n *parse.ListNode, use bool) {
 		case *parse.NewlineNode:
 			afterSemanticNode = false
 		default:
-			if r, ok := parseFn(node); ok {
+			if r := parseFn(node); r != nil {
 				r2 := rl.merge(r)
 				prevComments = &r2.comments
 			} else {
@@ -252,33 +280,33 @@ func sortStringSet(set map[string]struct{}) []string {
 	return ss
 }
 
-func parseRequire(n parse.Node) (r *require, ok bool) {
+func parseRequire(n parse.Node) *require {
 	switch n := n.(type) {
 	case *parse.SymbolNode:
-		return &require{name: n.Val}, true
+		return &require{name: n.Val}
 	case *parse.ListNode, *parse.VectorNode:
 		return parseRequireSeq(n.Children())
 	default:
-		return nil, false
+		return nil
 	}
 }
 
-func parseRequireSeq(nodes []parse.Node) (r *require, ok bool) {
+func parseRequireSeq(nodes []parse.Node) *require {
 	if len(nodes) == 0 || !goclj.Symbol(nodes[0]) {
-		return nil, false
+		return nil
 	}
-	r = &require{name: nodes[0].(*parse.SymbolNode).Val}
+	r := &require{name: nodes[0].(*parse.SymbolNode).Val}
 	var as string
 	var refer []parse.Node
 	if (len(nodes)-1)%2 != 0 {
-		return nil, false
+		return nil
 	}
 	numPairs := (len(nodes) - 1) / 2
 	for i := 0; i < numPairs; i++ {
 		k, v := nodes[i*2+1], nodes[i*2+2]
 		kw, ok := k.(*parse.KeywordNode)
 		if !ok {
-			return nil, false
+			return nil
 		}
 		// If there are multiple :as or :refers in a require, like
 		//   (require '[a :as b :as c])
@@ -287,7 +315,7 @@ func parseRequireSeq(nodes []parse.Node) (r *require, ok bool) {
 		case ":as":
 			vs, ok := v.(*parse.SymbolNode)
 			if !ok {
-				return nil, false
+				return nil
 			}
 			as = vs.Val
 		case ":refer":
@@ -300,59 +328,59 @@ func parseRequireSeq(nodes []parse.Node) (r *require, ok bool) {
 						*parse.CommentNode,
 						*parse.NewlineNode:
 					default:
-						return nil, false
+						return nil
 					}
 				}
 			default:
-				return nil, false
+				return nil
 			}
 		default:
-			return nil, false
+			return nil
 		}
 	}
 	if as != "" {
 		r.as = map[string]struct{}{as: {}}
 	}
 	r.origRefer = refer
-	return r, true
+	return r
 }
 
-func parseUse(n parse.Node) (r *require, ok bool) {
+func parseUse(n parse.Node) *require {
 	switch n := n.(type) {
 	case *parse.SymbolNode:
-		return &require{name: n.Val, referAll: true}, true
+		return &require{name: n.Val, referAll: true}
 	case *parse.ListNode, *parse.VectorNode:
 		return parseUseSeq(n.Children())
 	default:
-		return nil, false
+		return nil
 	}
 }
 
-func parseUseSeq(nodes []parse.Node) (r *require, ok bool) {
+func parseUseSeq(nodes []parse.Node) *require {
 	if len(nodes) == 0 || !goclj.Symbol(nodes[0]) {
-		return nil, false
+		return nil
 	}
-	r = &require{name: nodes[0].(*parse.SymbolNode).Val}
+	r := &require{name: nodes[0].(*parse.SymbolNode).Val}
 	switch len(nodes) {
 	case 1:
 		r.referAll = true
 	case 3:
 		kw, ok := nodes[1].(*parse.KeywordNode)
 		if !ok {
-			return nil, false
+			return nil
 		}
 		switch kw.Val {
 		case ":as":
 			n, ok := nodes[2].(*parse.SymbolNode)
 			if !ok {
-				return nil, false
+				return nil
 			}
 			r.as = map[string]struct{}{n.Val: {}}
 		case ":only":
 			switch nodes[2].(type) {
 			case *parse.ListNode, *parse.VectorNode:
 			default:
-				return nil, false
+				return nil
 			}
 			r.origRefer = nodes[2].Children()
 			for _, n := range r.origRefer {
@@ -361,14 +389,14 @@ func parseUseSeq(nodes []parse.Node) (r *require, ok bool) {
 					*parse.CommentNode,
 					*parse.NewlineNode:
 				default:
-					return nil, false
+					return nil
 				}
 			}
 		default:
-			return nil, false
+			return nil
 		}
 	default:
-		return nil, false
+		return nil
 	}
-	return r, true
+	return r
 }
