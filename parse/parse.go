@@ -283,7 +283,7 @@ func (t *Tree) parseMap(start token) *MapNode {
 	for {
 		switch tok := t.next(); tok.typ {
 		case tokRightBrace:
-			return &MapNode{start.pos, nodes}
+			return &MapNode{Pos: start.pos, Nodes: nodes}
 		case tokEOF:
 			t.unexpectedEOF(tok)
 		}
@@ -318,6 +318,8 @@ func (t *Tree) parseDispatch(tok token) Node {
 		return t.parseFnLiteral(tok)
 	case "#?", "#?@":
 		return t.parseReaderCond(tok)
+	case "#:":
+		return t.parseNamespacedMap(tok)
 	case "#_":
 		return t.parseReaderDiscard(tok)
 	case "#=":
@@ -394,6 +396,24 @@ func (t *Tree) parseReaderCond(start token) Node {
 	default:
 		panic("should not happen")
 	}
+}
+
+func (t *Tree) parseNamespacedMap(start token) *MapNode {
+	tok := t.next()
+	if tok.typ != tokKeyword {
+		panic("should not happen")
+	}
+	ns := tok.val
+	tok = t.next()
+	if tok.typ == tokEOF {
+		t.unexpectedEOF(tok)
+	}
+	if tok.typ != tokLeftBrace {
+		t.errorf(tok.pos, "namespaced map must have a map")
+	}
+	m := t.parseMap(tok)
+	m.Namespace = ns
+	return m
 }
 
 func (t *Tree) parseMetadata(start token) *MetadataNode {

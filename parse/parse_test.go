@@ -20,6 +20,8 @@ var testCases = []struct {
 	{":foobar", "keyword(:foobar)"},
 	{"(foo bar baz)", "list(length=3)"},
 	{"{:a b :c d}", "map(length=2)"},
+	{"#:foo{:a 1}", "map(ns=:foo, length=1)"},
+	{"#::{:b 1234}", "map(ns=::, length=1)"},
 	{`^String`, "metadata"},
 	{"nil", "nil"},
 	{"123.456", "num(123.456)"},
