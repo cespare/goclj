@@ -484,6 +484,8 @@ var defaultIndents = map[string]IndentStyle{
 	"reify":           IndentDeftype,
 	"set-test":        IndentListBody,
 	"testing":         IndentListBody,
+	"update":          IndentListBody,
+	"update-in":       IndentListBody,
 	"when":            IndentListBody,
 	"when-first":      IndentLet,
 	"when-let":        IndentLet,
