@@ -1,5 +1,6 @@
 (ns myns
-  (:require [org.lib1 :as lib2]
+  (:require [org.lib1
+             :as lib2]
             [org.lib3 :refer [mycond]]))
 
 (locking x

@@ -292,18 +292,24 @@ func parseRequire(n parse.Node) *require {
 }
 
 func parseRequireSeq(nodes []parse.Node) *require {
-	if len(nodes) == 0 || !goclj.Symbol(nodes[0]) {
+	semNodes := make([]parse.Node, 0, len(nodes))
+	for _, n := range nodes {
+		if goclj.Semantic(n) {
+			semNodes = append(semNodes, n)
+		}
+	}
+	if len(semNodes) == 0 || !goclj.Symbol(semNodes[0]) {
 		return nil
 	}
-	r := &require{name: nodes[0].(*parse.SymbolNode).Val}
+	r := &require{name: semNodes[0].(*parse.SymbolNode).Val}
 	var as string
 	var refer []parse.Node
-	if (len(nodes)-1)%2 != 0 {
+	if (len(semNodes)-1)%2 != 0 {
 		return nil
 	}
-	numPairs := (len(nodes) - 1) / 2
+	numPairs := (len(semNodes) - 1) / 2
 	for i := 0; i < numPairs; i++ {
-		k, v := nodes[i*2+1], nodes[i*2+2]
+		k, v := semNodes[i*2+1], semNodes[i*2+2]
 		kw, ok := k.(*parse.KeywordNode)
 		if !ok {
 			return nil
@@ -323,11 +329,10 @@ func parseRequireSeq(nodes []parse.Node) *require {
 			case *parse.ListNode, *parse.VectorNode:
 				refer = v.Children()
 				for _, n := range refer {
-					switch n.(type) {
-					case *parse.SymbolNode,
-						*parse.CommentNode,
-						*parse.NewlineNode:
-					default:
+					if !goclj.Semantic(n) {
+						continue
+					}
+					if _, ok := n.(*parse.SymbolNode); !ok {
 						return nil
 					}
 				}
