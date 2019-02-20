@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"math"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cespare/goclj/parse"
@@ -134,7 +135,7 @@ func testChangeCustom(t *testing.T, before, after string, f func(p *Printer)) {
 		t.Fatal(err)
 	}
 	want := readFile(t, after)
-	check(t, before, buf.Bytes(), want)
+	check(t, before, buf.String(), string(want))
 }
 
 func parseFile(t *testing.T, name string) *parse.Tree {
@@ -153,8 +154,8 @@ func readFile(t *testing.T, name string) []byte {
 	return b
 }
 
-func check(t *testing.T, desc string, got, want []byte) {
-	if !bytes.Equal(got, want) {
+func check(t *testing.T, desc, got, want string) {
+	if got != want {
 		gotFormatted := formatLines(got)
 		wantFormatted := formatLines(want)
 		t.Errorf("formatted %s incorrectly: got\n%swant\n%s",
@@ -162,26 +163,25 @@ func check(t *testing.T, desc string, got, want []byte) {
 	}
 }
 
-func formatLines(contents []byte) []byte {
-	lines := bytes.Split(contents, []byte("\n"))
+func formatLines(contents string) string {
+	lines := strings.Split(contents, "\n")
 	if len(lines) > 0 && len(lines[len(lines)-1]) == 0 {
 		lines = lines[:len(lines)-1]
 	}
-	var result []byte
+	var b strings.Builder
 	for i, line := range lines {
 		numWidth := int(math.Log10(float64(len(lines)))) + 1
-		formatted := []byte(fmt.Sprintf("  %*d ", numWidth, i+1))
+		fmt.Fprintf(&b, "  %*d ", numWidth, i+1)
 		prefix := true
 		for _, c := range line {
 			if prefix && c == ' ' {
-				formatted = append(formatted, '.')
+				b.WriteRune('·')
 			} else {
 				prefix = false
-				formatted = append(formatted, c)
+				b.WriteRune(c)
 			}
 		}
-		formatted = append(formatted, '\n')
-		result = append(result, formatted...)
+		b.WriteRune('\n')
 	}
-	return result
+	return b.String()
 }
