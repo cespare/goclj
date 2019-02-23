@@ -141,8 +141,10 @@ func useToRequire(ns parse.Node) {
 }
 
 func removeUnusedRequires(ns parse.Node, syms *symbolCache) {
-	nodes := ns.Children()[:0]
-	for _, n := range ns.Children() {
+	children := ns.Children()
+	nodes := children[:0]
+	for i := 0; i < len(children); i++ {
+		n := children[i]
 		if !goclj.FnFormKeyword(n, ":require") {
 			nodes = append(nodes, n)
 			continue
@@ -155,8 +157,13 @@ func removeUnusedRequires(ns parse.Node, syms *symbolCache) {
 			}
 		}
 		requires := rl.render()[0]
-		// If all that's left is (:require), drop it.
-		if len(requires.Children()) > 1 {
+		if len(requires.Children()) == 1 {
+			// If all that's left is (:require), drop it.
+			// If there's a newline afterwards, drop that too.
+			if i < len(children)-1 && goclj.Newline(children[i+1]) {
+				i++
+			}
+		} else {
 			nodes = append(nodes, requires)
 		}
 	}
