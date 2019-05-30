@@ -32,7 +32,7 @@ type Printer struct {
 	// ThreadFirstStyleOverrides.
 	threadFirstStyles map[string]ThreadFirstStyle
 	specialIndent     map[parse.Node]IndentStyle
-	threadFirst       map[*parse.ListNode]struct{}
+	threadFirst       map[parse.Node]struct{}
 	docstrings        map[*parse.StringNode]struct{}
 
 	// The requires and refers maps track all the require aliases and
@@ -48,7 +48,7 @@ func NewPrinter(w io.Writer) *Printer {
 		bufWriter:     &bufWriter{bufio.NewWriter(w)},
 		IndentChar:    ' ',
 		specialIndent: make(map[parse.Node]IndentStyle),
-		threadFirst:   make(map[*parse.ListNode]struct{}),
+		threadFirst:   make(map[parse.Node]struct{}),
 		docstrings:    make(map[*parse.StringNode]struct{}),
 		requires:      make(map[string]string),
 		refers:        make(map[string]string),
