@@ -12,7 +12,7 @@ func (p *Printer) markRequires(n parse.Node) {
 		return
 	}
 	for _, n := range n.Children() {
-		if !goclj.FnFormKeyword(n, ":require") {
+		if !goclj.FnFormKeyword(n, ":require", ":require-macros") {
 			continue
 		}
 		for _, n := range n.Children()[1:] {
@@ -23,14 +23,106 @@ func (p *Printer) markRequires(n parse.Node) {
 			for as := range r.as {
 				p.requires[as] = r.name
 			}
-			for _, n := range r.origRefer {
-				if n, ok := n.(*parse.SymbolNode); ok {
-					p.refers[n.Val] = r.name
+			for _, ref := range []*referList{&r.refer, &r.referMacros} {
+				for _, n := range ref.origRefer {
+					if n, ok := n.(*parse.SymbolNode); ok {
+						p.refers[n.Val] = r.name
+					}
+				}
+				for ref := range ref.refer {
+					p.refers[ref] = r.name
 				}
 			}
-			for ref := range r.refer {
-				p.refers[ref] = r.name
+		}
+	}
+}
+
+// referList represents a list of symbols following either a :refer or
+// :refer-macros keyword.
+type referList struct {
+	// origRefer is the original refer vector/list.
+	// It is preserved and reused if possible, but if two refer lists are
+	// merged, then refer is used instead (and origRefer is set to nil).
+	origRefer []parse.Node
+	refer     map[string]struct{}
+}
+
+func (rl *referList) merge(rl1 *referList) {
+	if rl1 == nil {
+		return
+	}
+	if rl1.refer != nil {
+		panic("merge arg has non-nil refer")
+	}
+	if len(rl1.origRefer) == 0 {
+		return
+	}
+	// If the current list has *no* refers, just copy the origRefer
+	// list from the other.
+	if rl.origRefer == nil && rl.refer == nil {
+		rl.origRefer = rl1.origRefer
+		return
+	}
+	// Otherwise, move everything into rl.refer (if not already moved by
+	// a previous merge) and copy each symbol from the other list.
+	if rl.origRefer != nil {
+		rl.extractOrigRefer()
+	}
+	for _, n := range rl1.origRefer {
+		if n, ok := n.(*parse.SymbolNode); ok {
+			rl.refer[n.Val] = struct{}{}
+		}
+	}
+}
+
+// render returns a parse.VectorNode for all symbols in this referList,
+// or nil if there are no symbols.
+func (rl *referList) render() *parse.VectorNode {
+	if rl.origRefer != nil {
+		return &parse.VectorNode{Nodes: rl.origRefer}
+	}
+	if len(rl.refer) == 0 {
+		return nil
+	}
+	var refs []parse.Node
+	for _, s := range sortStringSet(rl.refer) {
+		refs = append(refs, &parse.SymbolNode{Val: s})
+	}
+	return &parse.VectorNode{Nodes: refs}
+}
+
+// extractOrigRefer moves all symbols in the origRefer slice
+// into rl.refer map.
+func (rl *referList) extractOrigRefer() {
+	rl.refer = make(map[string]struct{})
+	for _, n := range rl.origRefer {
+		if n, ok := n.(*parse.SymbolNode); ok {
+			rl.refer[n.Val] = struct{}{}
+		}
+	}
+	rl.origRefer = nil
+}
+
+// removeUnused removes all symbols from this referList that aren't
+// present in sc.
+func (rl *referList) removeUnused(sc *symbolCache) {
+	if rl.origRefer != nil {
+		// If origRefer doesn't have any unused elements, leave it
+		// alone. Otherwise, rewrite it as a refer and handle below.
+		for _, n := range rl.origRefer {
+			n, ok := n.(*parse.SymbolNode)
+			if !ok {
+				continue
 			}
+			if !sc.usesSym(n.Val) {
+				rl.extractOrigRefer()
+				break
+			}
+		}
+	}
+	for ref := range rl.refer {
+		if !sc.usesSym(ref) {
+			delete(rl.refer, ref)
 		}
 	}
 }
@@ -39,13 +131,17 @@ type require struct {
 	name     string
 	as       map[string]struct{}
 	referAll bool
-	// origRefer is the original refer vector/list.
-	// It is preserved and reused if possible, but if two refer lists are
-	// merged, then refer is used instead (and origRefer is set to nil).
-	origRefer []parse.Node
-	refer     map[string]struct{}
+
+	refer       referList
+	referMacros referList
 
 	comments nodeComments
+}
+
+func newRequire(name string) *require {
+	return &require{
+		name: name,
+	}
 }
 
 type nodeComments struct {
@@ -81,6 +177,9 @@ type nodeWithComments struct {
 
 type requireList struct {
 	m map[string]*require
+	// macros is true if this represents a :require-macros list.
+	macros bool
+
 	// unrecognized semantic nodes
 	extraRequire []*nodeWithComments
 	extraUse     []*nodeWithComments
@@ -107,37 +206,9 @@ func (rl *requireList) merge(r *require) *require {
 		}
 	}
 	r2.referAll = r.referAll || r2.referAll
-	if r.refer != nil {
-		panic("merge arg has non-nil refer")
-	}
-	if len(r.origRefer) == 0 {
-		return r2
-	}
-	if r2.origRefer == nil && r2.refer == nil {
-		r2.origRefer = r.origRefer
-		return r2
-	}
-	if r2.origRefer != nil {
-		r2.extractOrigRefer()
-	}
-	for _, n := range r.origRefer {
-		n, ok := n.(*parse.SymbolNode)
-		if !ok {
-			continue
-		}
-		r2.refer[n.Val] = struct{}{}
-	}
+	r2.refer.merge(&r.refer)
+	r2.referMacros.merge(&r.referMacros)
 	return r2
-}
-
-func (r *require) extractOrigRefer() {
-	r.refer = make(map[string]struct{})
-	for _, n := range r.origRefer {
-		if n, ok := n.(*parse.SymbolNode); ok {
-			r.refer[n.Val] = struct{}{}
-		}
-	}
-	r.origRefer = nil
 }
 
 func (rl *requireList) parseRequireUse(nodes []parse.Node, use bool) {
@@ -151,6 +222,10 @@ func (rl *requireList) parseRequireUse(nodes []parse.Node, use bool) {
 	if use {
 		parseFn = parseUse
 		extra = &rl.extraUse
+	}
+	switch nodes[0].(*parse.KeywordNode).Val {
+	case ":require-macros", ":use-macros":
+		rl.macros = true
 	}
 	for _, node := range nodes[1:] {
 		switch node := node.(type) {
@@ -180,8 +255,11 @@ func (rl *requireList) parseRequireUse(nodes []parse.Node, use bool) {
 }
 
 func (rl *requireList) render() []parse.Node {
-	nodes := []parse.Node{
-		&parse.KeywordNode{Val: ":require"},
+	var nodes []parse.Node
+	if rl.macros {
+		nodes = append(nodes, &parse.KeywordNode{Val: ":require-macros"})
+	} else {
+		nodes = append(nodes, &parse.KeywordNode{Val: ":require"})
 	}
 	for _, r := range rl.m {
 		for _, c := range r.comments.commentsAbove {
@@ -207,23 +285,17 @@ func (rl *requireList) render() []parse.Node {
 				&parse.KeywordNode{Val: ":as"},
 				&parse.SymbolNode{Val: as[0]})
 		}
-		switch {
-		case r.referAll:
+		if r.referAll {
 			parts = append(parts,
 				&parse.KeywordNode{Val: ":refer"},
 				&parse.KeywordNode{Val: ":all"})
-		case r.origRefer != nil:
-			parts = append(parts,
-				&parse.KeywordNode{Val: ":refer"},
-				&parse.VectorNode{Nodes: r.origRefer})
-		case len(r.refer) > 0:
-			var refs []parse.Node
-			for _, s := range sortStringSet(r.refer) {
-				refs = append(refs, &parse.SymbolNode{Val: s})
+		} else {
+			if n := r.refer.render(); n != nil {
+				parts = append(parts, &parse.KeywordNode{Val: ":refer"}, n)
 			}
-			parts = append(parts,
-				&parse.KeywordNode{Val: ":refer"},
-				&parse.VectorNode{Nodes: refs})
+			if n := r.referMacros.render(); n != nil {
+				parts = append(parts, &parse.KeywordNode{Val: ":refer-macros"}, n)
+			}
 		}
 		nodes = append(nodes, &parse.VectorNode{Nodes: parts})
 		if r.comments.commentBeside != nil {
@@ -283,7 +355,7 @@ func sortStringSet(set map[string]struct{}) []string {
 func parseRequire(n parse.Node) *require {
 	switch n := n.(type) {
 	case *parse.SymbolNode:
-		return &require{name: n.Val}
+		return newRequire(n.Val)
 	case *parse.ListNode, *parse.VectorNode:
 		return parseRequireSeq(n.Children())
 	default:
@@ -301,9 +373,10 @@ func parseRequireSeq(nodes []parse.Node) *require {
 	if len(semNodes) == 0 || !goclj.Symbol(semNodes[0]) {
 		return nil
 	}
-	r := &require{name: semNodes[0].(*parse.SymbolNode).Val}
+	r := newRequire(semNodes[0].(*parse.SymbolNode).Val)
 	var as string
 	var refer []parse.Node
+	var referMacros []parse.Node
 	if (len(semNodes)-1)%2 != 0 {
 		return nil
 	}
@@ -324,11 +397,15 @@ func parseRequireSeq(nodes []parse.Node) *require {
 				return nil
 			}
 			as = vs.Val
-		case ":refer":
+		case ":refer", ":refer-macros":
+			if kw.Val == ":refer" {
+				refer = v.Children()
+			} else {
+				referMacros = v.Children()
+			}
 			switch v.(type) {
 			case *parse.ListNode, *parse.VectorNode:
-				refer = v.Children()
-				for _, n := range refer {
+				for _, n := range v.Children() {
 					if !goclj.Semantic(n) {
 						continue
 					}
@@ -346,14 +423,17 @@ func parseRequireSeq(nodes []parse.Node) *require {
 	if as != "" {
 		r.as = map[string]struct{}{as: {}}
 	}
-	r.origRefer = refer
+	r.refer.origRefer = refer
+	r.referMacros.origRefer = referMacros
 	return r
 }
 
 func parseUse(n parse.Node) *require {
 	switch n := n.(type) {
 	case *parse.SymbolNode:
-		return &require{name: n.Val, referAll: true}
+		r := newRequire(n.Val)
+		r.referAll = true
+		return r
 	case *parse.ListNode, *parse.VectorNode:
 		return parseUseSeq(n.Children())
 	default:
@@ -365,7 +445,7 @@ func parseUseSeq(nodes []parse.Node) *require {
 	if len(nodes) == 0 || !goclj.Symbol(nodes[0]) {
 		return nil
 	}
-	r := &require{name: nodes[0].(*parse.SymbolNode).Val}
+	r := newRequire(nodes[0].(*parse.SymbolNode).Val)
 	switch len(nodes) {
 	case 1:
 		r.referAll = true
@@ -387,8 +467,8 @@ func parseUseSeq(nodes []parse.Node) *require {
 			default:
 				return nil
 			}
-			r.origRefer = nodes[2].Children()
-			for _, n := range r.origRefer {
+			r.refer.origRefer = nodes[2].Children()
+			for _, n := range r.refer.origRefer {
 				switch n.(type) {
 				case *parse.SymbolNode,
 					*parse.CommentNode,

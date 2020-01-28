@@ -1,7 +1,7 @@
 (ns a
   (:require [b]
             [c :refer :all]
-            [d :as e :refer [h]]
+            [d :as e :refer [h] :refer-macros [f3]]
             [foo-bar.x-y]
             [foo-bar2.x-y]
             [k :refer :all]
@@ -9,9 +9,12 @@
             [o :as p]
             [q :as r])
   (:import foo_bar.x_y.Z
-           [foo_bar2.x_y A B C]))
+           [foo_bar2.x_y A B C])
+  (:require-macros [w :as x]))
 
 (e/x #'p/x)
 (h 3)
 (b/x ::k1 ::q/k2 ::u/k3)
 #::r{:a 0 :b 1}
+(x/a 1)
+(f3 1)

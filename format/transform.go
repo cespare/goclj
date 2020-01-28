@@ -14,8 +14,8 @@ import (
 type Transform int
 
 const (
-	// TransformSortImportRequire sorts :import and :require declarations
-	// in ns blocks.
+	// TransformSortImportRequire sorts :import, :require, and :require-macros
+	// declarations in ns blocks.
 	TransformSortImportRequire Transform = iota
 
 	// TransformRemoveTrailingNewlines removes extra newlines following
@@ -145,7 +145,7 @@ func removeUnusedRequires(ns parse.Node, syms *symbolCache) {
 	nodes := children[:0]
 	for i := 0; i < len(children); i++ {
 		n := children[i]
-		if !goclj.FnFormKeyword(n, ":require") {
+		if !goclj.FnFormKeyword(n, ":require", ":require-macros") {
 			nodes = append(nodes, n)
 			continue
 		}
@@ -172,7 +172,7 @@ func removeUnusedRequires(ns parse.Node, syms *symbolCache) {
 
 func sortNS(ns parse.Node) {
 	for _, n := range ns.Children()[1:] {
-		if goclj.FnFormKeyword(n, ":require", ":import") {
+		if goclj.FnFormKeyword(n, ":require", ":require-macros", ":import") {
 			sortImportRequire(n.(*parse.ListNode))
 		}
 	}

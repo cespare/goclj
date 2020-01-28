@@ -100,10 +100,12 @@ func TestCustomIndent(t *testing.T) {
 
 	f := func(p *Printer) {
 		p.IndentOverrides = map[string]IndentStyle{
-			"delete":          IndentListBody,
-			"up":              IndentListBody,
-			"org.lib1/f":      IndentListBody,
-			"org.lib3/mycond": IndentCond0,
+			"delete":            IndentListBody,
+			"up":                IndentListBody,
+			"org.lib1/f":        IndentListBody,
+			"org.lib3/mycond":   IndentCond0,
+			"org.lib3/mymacro1": IndentLet,
+			"org.lib4/mymacro2": IndentLet,
 		}
 	}
 	testChangeCustom(t, file0, file1, f)

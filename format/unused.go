@@ -115,28 +115,12 @@ func (sc *symbolCache) unused(r *require) bool {
 			delete(r.as, as)
 		}
 	}
-	if r.origRefer != nil {
-		// If origRefer doesn't have any unused elements, leave it
-		// alone. Otherwise, rewrite it as a refer and handle below.
-		for _, n := range r.origRefer {
-			n, ok := n.(*parse.SymbolNode)
-			if !ok {
-				continue
-			}
-			if !sc.usesSym(n.Val) {
-				r.extractOrigRefer()
-				break
-			}
-		}
-	}
-	for ref := range r.refer {
-		if !sc.usesSym(ref) {
-			delete(r.refer, ref)
-		}
-	}
+	r.refer.removeUnused(sc)
+	r.referMacros.removeUnused(sc)
 	return !sc.usesNamespace(r.name) &&
 		!sc.usesRequireAsImport(r.name) &&
 		len(r.as) == 0 &&
 		!r.referAll &&
-		r.origRefer == nil && len(r.refer) == 0
+		r.refer.origRefer == nil && len(r.refer.refer) == 0 &&
+		r.referMacros.origRefer == nil && len(r.referMacros.refer) == 0
 }
