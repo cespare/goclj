@@ -39,11 +39,19 @@ func nodesToString(nodes []Node, depth int) string {
 
 func (t *Tree) parse() (err error) {
 	defer t.recover(&err)
+	var linkParents func(Node)
+	linkParents = func(n Node) {
+		for _, c := range n.Children() {
+			c.setParent(n)
+			linkParents(c)
+		}
+	}
 	for {
 		node := t.parseNext()
 		if node == nil {
 			break
 		}
+		linkParents(node)
 		if t.includeNonSemantic || isSemantic(node) {
 			t.Roots = append(t.Roots, node)
 		}
@@ -144,20 +152,20 @@ func (t *Tree) parseNext() Node {
 		case tokSymbol:
 			switch val := tok.val; val {
 			case "nil":
-				return &NilNode{tok.pos}
+				return &NilNode{Pos: tok.pos}
 			case "true", "false":
-				return &BoolNode{tok.pos, val == "true"}
+				return &BoolNode{Pos: tok.pos, Val: val == "true"}
 			default:
-				return &SymbolNode{tok.pos, tok.val}
+				return &SymbolNode{Pos: tok.pos, Val: tok.val}
 			}
 		case tokCharLiteral:
 			return t.parseCharLiteral(tok)
 		case tokComment:
-			return &CommentNode{tok.pos, tok.val}
+			return &CommentNode{Pos: tok.pos, Text: tok.val}
 		case tokAtSign:
-			return &DerefNode{tok.pos, t.parseNextSemantic()}
+			return &DerefNode{Pos: tok.pos, Node: t.parseNextSemantic()}
 		case tokKeyword:
-			return &KeywordNode{tok.pos, tok.val}
+			return &KeywordNode{Pos: tok.pos, Val: tok.val}
 		case tokLeftParen:
 			return t.parseList(tok)
 		case tokLeftBrace:
@@ -165,26 +173,26 @@ func (t *Tree) parseNext() Node {
 		case tokCircumflex:
 			return t.parseMetadata(tok)
 		case tokNewline:
-			return &NewlineNode{tok.pos}
+			return &NewlineNode{Pos: tok.pos}
 		case tokNumber:
 			// TODO: need to parse the number here; a number token may not be valid.
-			return &NumberNode{tok.pos, tok.val}
+			return &NumberNode{Pos: tok.pos, Val: tok.val}
 		case tokApostrophe:
-			return &QuoteNode{tok.pos, t.parseNextSemantic()}
+			return &QuoteNode{Pos: tok.pos, Node: t.parseNextSemantic()}
 		case tokString:
-			return &StringNode{tok.pos, tok.val[1 : len(tok.val)-1]}
+			return &StringNode{Pos: tok.pos, Val: tok.val[1 : len(tok.val)-1]}
 		case tokBacktick:
-			return &SyntaxQuoteNode{tok.pos, t.parseNextSemantic()}
+			return &SyntaxQuoteNode{Pos: tok.pos, Node: t.parseNextSemantic()}
 		case tokTilde:
 			next := t.next()
 			switch next.typ {
 			case tokAtSign:
-				return &UnquoteSpliceNode{tok.pos, t.parseNextSemantic()}
+				return &UnquoteSpliceNode{Pos: tok.pos, Node: t.parseNextSemantic()}
 			case tokEOF:
 				t.unexpectedEOF(next)
 			}
 			t.backup()
-			return &UnquoteNode{tok.pos, t.parseNextSemantic()}
+			return &UnquoteNode{Pos: tok.pos, Node: t.parseNextSemantic()}
 		case tokLeftBracket:
 			return t.parseVector(tok)
 		case tokDispatch:
@@ -258,7 +266,11 @@ func (t *Tree) parseCharLiteral(tok token) *CharacterNode {
 			}
 		}
 	}
-	return &CharacterNode{tok.pos, r, tok.val}
+	return &CharacterNode{
+		Pos:  tok.pos,
+		Val:  r,
+		Text: tok.val,
+	}
 }
 
 func (t *Tree) parseList(start token) *ListNode {
@@ -266,7 +278,7 @@ func (t *Tree) parseList(start token) *ListNode {
 	for {
 		switch tok := t.next(); tok.typ {
 		case tokRightParen:
-			return &ListNode{start.pos, nodes}
+			return &ListNode{Pos: start.pos, Nodes: nodes}
 		case tokEOF:
 			t.unexpectedEOF(tok)
 		}
@@ -300,7 +312,7 @@ func (t *Tree) parseVector(start token) *VectorNode {
 	for {
 		switch tok := t.next(); tok.typ {
 		case tokRightBracket:
-			return &VectorNode{start.pos, nodes}
+			return &VectorNode{Pos: start.pos, Nodes: nodes}
 		case tokEOF:
 			t.unexpectedEOF(tok)
 		}
@@ -344,7 +356,7 @@ func (t *Tree) parseTag(start token) *TagNode {
 	tok := t.next()
 	switch tok.typ {
 	case tokSymbol:
-		return &TagNode{start.pos, tok.val}
+		return &TagNode{Pos: start.pos, Val: tok.val}
 	case tokEOF:
 		t.unexpectedEOF(tok)
 	default:
@@ -367,7 +379,7 @@ func (t *Tree) parseFnLiteral(start token) *FnLiteralNode {
 		switch tok = t.next(); tok.typ {
 		case tokRightParen:
 			t.inLambda = false
-			return &FnLiteralNode{start.pos, nodes}
+			return &FnLiteralNode{Pos: start.pos, Nodes: nodes}
 		case tokEOF:
 			t.unexpectedEOF(tok)
 		}
@@ -390,9 +402,9 @@ func (t *Tree) parseReaderCond(start token) Node {
 	list := t.parseList(tok)
 	switch start.val {
 	case "#?":
-		return &ReaderCondNode{start.pos, list.Nodes}
+		return &ReaderCondNode{Pos: start.pos, Nodes: list.Nodes}
 	case "#?@":
-		return &ReaderCondSpliceNode{start.pos, list.Nodes}
+		return &ReaderCondSpliceNode{Pos: start.pos, Nodes: list.Nodes}
 	default:
 		panic("should not happen")
 	}
@@ -422,7 +434,7 @@ func (t *Tree) parseMetadata(start token) *MetadataNode {
 		t.unexpectedEOF(tok)
 	}
 	t.backup()
-	return &MetadataNode{start.pos, t.parseNext()}
+	return &MetadataNode{Pos: start.pos, Node: t.parseNext()}
 }
 
 func (t *Tree) parseReaderDiscard(start token) *ReaderDiscardNode {
@@ -431,7 +443,7 @@ func (t *Tree) parseReaderDiscard(start token) *ReaderDiscardNode {
 		t.unexpectedEOF(tok)
 	}
 	t.backup()
-	return &ReaderDiscardNode{start.pos, t.parseNext()}
+	return &ReaderDiscardNode{Pos: start.pos, Node: t.parseNext()}
 }
 
 func (t *Tree) parseReaderEval(start token) *ReaderEvalNode {
@@ -440,7 +452,7 @@ func (t *Tree) parseReaderEval(start token) *ReaderEvalNode {
 		t.unexpectedEOF(tok)
 	}
 	t.backup()
-	return &ReaderEvalNode{start.pos, t.parseNext()}
+	return &ReaderEvalNode{Pos: start.pos, Node: t.parseNext()}
 }
 
 func (t *Tree) parseRegex(start token) *RegexNode {
@@ -448,7 +460,7 @@ func (t *Tree) parseRegex(start token) *RegexNode {
 	if tok.typ != tokString {
 		panic("should not happen")
 	}
-	return &RegexNode{start.pos, tok.val[1 : len(tok.val)-1]}
+	return &RegexNode{Pos: start.pos, Val: tok.val[1 : len(tok.val)-1]}
 }
 
 func (t *Tree) parseSet(start token) *SetNode {
@@ -460,7 +472,7 @@ func (t *Tree) parseSet(start token) *SetNode {
 	for {
 		switch tok := t.next(); tok.typ {
 		case tokRightBrace:
-			return &SetNode{start.pos, nodes}
+			return &SetNode{Pos: start.pos, Nodes: nodes}
 		case tokEOF:
 			t.unexpectedEOF(tok)
 		}
@@ -475,7 +487,7 @@ func (t *Tree) parseSet(start token) *SetNode {
 func (t *Tree) parseVarQuote(start token) *VarQuoteNode {
 	switch tok := t.next(); tok.typ {
 	case tokSymbol:
-		return &VarQuoteNode{start.pos, tok.val}
+		return &VarQuoteNode{Pos: start.pos, Val: tok.val}
 	case tokEOF:
 		t.unexpectedEOF(tok)
 	default:
