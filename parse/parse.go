@@ -14,7 +14,9 @@ type Tree struct {
 	Roots []Node
 
 	// Config
-	includeNonSemantic bool
+	includeNonSemantic  bool
+	ignoreCommentForm   bool
+	ignoreReaderDiscard bool
 
 	// Parser state
 	tok       token // single-item lookahead
@@ -52,7 +54,7 @@ func (t *Tree) parse() (err error) {
 			break
 		}
 		linkParents(node)
-		if t.includeNonSemantic || isSemantic(node) {
+		if t.includeNode(node) {
 			t.Roots = append(t.Roots, node)
 		}
 	}
@@ -122,12 +124,18 @@ const (
 	// IncludeNonSemantic makes the parser include non-semantic nodes:
 	// CommentNodes and NewlineNodes.
 	IncludeNonSemantic ParseOpts = 1 << iota
+	// IgnoreCommentForm makes the parser ignore (comment ...) forms.
+	IgnoreCommentForm
+	// IgnoreReaderDiscard makes the parser ignore forms preceded by #_.
+	IgnoreReaderDiscard
 )
 
 func Reader(r io.Reader, filename string, opts ParseOpts) (*Tree, error) {
 	t := &Tree{
-		includeNonSemantic: opts&IncludeNonSemantic != 0,
-		lex:                lex(filename, bufio.NewReader(r)),
+		includeNonSemantic:  opts&IncludeNonSemantic != 0,
+		ignoreCommentForm:   opts&IgnoreCommentForm != 0,
+		ignoreReaderDiscard: opts&IgnoreReaderDiscard != 0,
+		lex:                 lex(filename, bufio.NewReader(r)),
 	}
 	if err := t.parse(); err != nil {
 		return nil, err
@@ -284,7 +292,7 @@ func (t *Tree) parseList(start token) *ListNode {
 		}
 		t.backup()
 		node := t.parseNext()
-		if t.includeNonSemantic || isSemantic(node) {
+		if t.includeNode(node) {
 			nodes = append(nodes, node)
 		}
 	}
@@ -301,7 +309,7 @@ func (t *Tree) parseMap(start token) *MapNode {
 		}
 		t.backup()
 		node := t.parseNext()
-		if t.includeNonSemantic || isSemantic(node) {
+		if t.includeNode(node) {
 			nodes = append(nodes, node)
 		}
 	}
@@ -318,7 +326,7 @@ func (t *Tree) parseVector(start token) *VectorNode {
 		}
 		t.backup()
 		node := t.parseNext()
-		if t.includeNonSemantic || isSemantic(node) {
+		if t.includeNode(node) {
 			nodes = append(nodes, node)
 		}
 	}
@@ -385,7 +393,7 @@ func (t *Tree) parseFnLiteral(start token) *FnLiteralNode {
 		}
 		t.backup()
 		node := t.parseNext()
-		if t.includeNonSemantic || isSemantic(node) {
+		if t.includeNode(node) {
 			nodes = append(nodes, node)
 		}
 	}
@@ -478,7 +486,7 @@ func (t *Tree) parseSet(start token) *SetNode {
 		}
 		t.backup()
 		node := t.parseNext()
-		if t.includeNonSemantic || isSemantic(node) {
+		if t.includeNode(node) {
 			nodes = append(nodes, node)
 		}
 	}
@@ -494,4 +502,24 @@ func (t *Tree) parseVarQuote(start token) *VarQuoteNode {
 		t.unexpected(tok)
 	}
 	panic("unreached")
+}
+
+func (t *Tree) includeNode(node Node) bool {
+	if list, ok := node.(*ListNode); ok {
+		children := list.Children()
+		if len(children) > 0 {
+			if sym, ok := children[0].(*SymbolNode); ok {
+				if sym.Val == "comment" && t.ignoreCommentForm {
+					return false
+				}
+			}
+		}
+	}
+	if _, ok := node.(*ReaderDiscardNode); ok && t.ignoreReaderDiscard {
+		return false
+	}
+	if !t.includeNonSemantic && !isSemantic(node) {
+		return false
+	}
+	return true
 }
