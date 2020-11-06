@@ -110,6 +110,49 @@ func walkFindNode(nodes []Node, target string) Node {
 	return nil
 }
 
+func TestIgnoreReaderDiscard(t *testing.T) {
+	for _, tc := range []struct {
+		s    string
+		want string
+	}{
+		{"#_ignore", ""},
+		{"a #_ignore b", "sym(a) sym(b)"},
+		{"[a b #_ignore]", "vector(length=2) sym(a) sym(b)"},
+	} {
+		tree, err := Reader(strings.NewReader(tc.s), "temp", IgnoreReaderDiscard)
+		if err != nil {
+			t.Fatalf("error parsing %q: %s", tc.s, err)
+		}
+		got := strings.Join(tree.flatStrings(), " ")
+		if got != tc.want {
+			t.Errorf("for %q: got %s; want %s", tc.s, got, tc.want)
+			continue
+		}
+	}
+}
+
+func TestIgnoreCommentForm(t *testing.T) {
+	for _, tc := range []struct {
+		s    string
+		want string
+	}{
+		{"(comment 1 2 3)", ""},
+		{"'(comment 1)", "quote list(length=2) sym(comment) num(1)"},
+		{"a (comment 1) b", "sym(a) sym(b)"},
+		{"[a b (comment 1)]", "vector(length=2) sym(a) sym(b)"},
+	} {
+		tree, err := Reader(strings.NewReader(tc.s), "temp", IgnoreCommentForm)
+		if err != nil {
+			t.Fatalf("error parsing %q: %s", tc.s, err)
+		}
+		got := strings.Join(tree.flatStrings(), " ")
+		if got != tc.want {
+			t.Errorf("for %q: got %s; want %s", tc.s, got, tc.want)
+			continue
+		}
+	}
+}
+
 // Issue 32.
 func TestUnreadable(t *testing.T) {
 	_, err := Reader(strings.NewReader("#<X Y Z>"), "temp", IncludeNonSemantic)
