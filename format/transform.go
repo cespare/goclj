@@ -104,6 +104,12 @@ const (
 	//   [foo :as x] ; if there is no x/y in the ns, this is removed
 	//   [foo :refer [x]] ; if x does not appear in the ns, this is removed
 	//
+	// To preserve a :require statement which is only present for its
+	// side-effects, require it as vector with a single namespace, and
+	// don't use :as or :refer:
+	//
+	//   [foo]
+	//
 	// It is not enabled by default.
 	TransformRemoveUnusedRequires
 )
@@ -202,22 +208,39 @@ func removeUnusedRequires(ns parse.Node, syms *symbolCache) {
 			nodes = append(nodes, n)
 			continue
 		}
+		// As a special case, never remove requires of the form [foo]
+		// because they may be needed for their side-effects.
+		var keep []parse.Node
+		var requires []parse.Node
+		for i, child := range n.Children() {
+			if i == 0 {
+				requires = append(requires, child)
+				continue
+			}
+			if vec, ok := child.(*parse.VectorNode); ok && len(vec.Children()) == 1 {
+				keep = append(keep, child)
+			} else {
+				requires = append(requires, child)
+			}
+		}
+
 		rl := newRequireList()
-		rl.parseRequireUse(n.Children(), false)
+		rl.parseRequireUse(requires, false)
 		for name, r := range rl.m {
 			if syms.unused(r) {
 				delete(rl.m, name)
 			}
 		}
-		requires := rl.render()[0]
-		if len(requires.Children()) <= 2 {
+		require := rl.render()[0].(*parse.ListNode)
+		require.Nodes = append(require.Nodes, keep...)
+		if len(require.Nodes) <= 2 {
 			// If all that's left is (:require), drop it.
 			// If there's a newline afterwards, drop that too.
 			if i < len(children)-1 && goclj.Newline(children[i+1]) {
 				i++
 			}
 		} else {
-			nodes = append(nodes, requires)
+			nodes = append(nodes, require)
 		}
 	}
 	ns.SetChildren(nodes)
