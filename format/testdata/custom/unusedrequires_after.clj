@@ -8,11 +8,13 @@
     [k :refer :all]
     [myspec :as u]
     [o :as p]
-    [q :as r])
+    [q :as r]
+    [s])
   (:import
     (foo_bar.x_y Z)
     (foo_bar2.x_y A B C))
   (:require-macros
+    [v]
     [w :as x]))
 
 (e/x #'p/x)
