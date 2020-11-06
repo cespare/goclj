@@ -1,6 +1,7 @@
 (ns a
   (:require [b]
             [c :refer :all]
+            [s]
             [d :as e]
             [d :as f :refer [g h i] :refer-macros [f2 f3]]
             [foo-bar.x-y :as z]
