@@ -38,6 +38,7 @@ func TestFixture(t *testing.T) {
 		"issue49",
 		"issue55",
 		"issue67",
+		"indent_for",
 	} {
 		t.Run(fixture, func(t *testing.T) {
 			testFixture(t, fixture+".clj")
