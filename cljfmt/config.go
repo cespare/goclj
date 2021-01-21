@@ -135,6 +135,7 @@ var indentStyles = map[string]format.IndentStyle{
 	":list-body": format.IndentListBody,
 	":let":       format.IndentLet,
 	":letfn":     format.IndentLetfn,
+	":for":       format.IndentFor,
 	":deftype":   format.IndentDeftype,
 	":cond0":     format.IndentCond0,
 	":cond1":     format.IndentCond1,

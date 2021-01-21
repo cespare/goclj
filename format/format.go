@@ -235,15 +235,55 @@ func (p *Printer) applySpecialIndentRules(node *parse.ListNode) {
 			p.applySpecialLet(node.Nodes)
 		case IndentLetfn:
 			p.applySpecialLetfn(node.Nodes)
+		case IndentFor:
+			p.applySpecialFor(node.Nodes)
 		case IndentDeftype:
 			p.applySpecialDeftype(node.Nodes)
 		}
 	}
 }
 
+func (p *Printer) applySpecialForLet(nodes []parse.Node) {
+	i := -1
+	prevLet := false
+	for _, node := range nodes {
+		if !goclj.Semantic(node) {
+			continue
+		}
+		if prevLet {
+			if v, ok := node.(*parse.VectorNode); ok {
+				p.specialIndent[v] = indentBindings
+			}
+		}
+		prevLet = false
+		i++
+		if i%2 != 0 {
+			continue
+		}
+		if k, ok := node.(*parse.KeywordNode); ok {
+			if k.Val == ":let" {
+				prevLet = true
+			}
+		}
+	}
+}
+
+func (p *Printer) applySpecialFor(nodes []parse.Node) {
+	for _, node := range nodes[1:] {
+		if !goclj.Semantic(node) {
+			continue
+		}
+		if v, ok := node.(*parse.VectorNode); ok {
+			p.specialIndent[v] = indentBindings
+			p.applySpecialForLet(v.Nodes)
+		}
+		return
+	}
+}
+
 func (p *Printer) applySpecialLet(nodes []parse.Node) {
 	for _, node := range nodes[1:] {
-		if goclj.Newline(node) {
+		if !goclj.Semantic(node) {
 			continue
 		}
 		if v, ok := node.(*parse.VectorNode); ok {
@@ -255,7 +295,7 @@ func (p *Printer) applySpecialLet(nodes []parse.Node) {
 
 func (p *Printer) applySpecialLetfn(nodes []parse.Node) {
 	for _, node := range nodes[1:] {
-		if goclj.Newline(node) {
+		if !goclj.Semantic(node) {
 			continue
 		}
 		v, ok := node.(*parse.VectorNode)
@@ -382,6 +422,14 @@ const (
 	//   (let [foo
 	//           bar])
 	IndentLet
+	// IndentFor is for for-like forms. This is like IndentLet, except
+	// that the let-style bindings can contain ":let" introducing another
+	// let-style binding (the even-numbered ones are indented).
+	//   (for [foo
+	//           bar
+	//         :let [x
+	//                 baz])
+	IndentFor
 	// indentBindings is for the paired bindings (usually inside a vector
 	// form) of a form indented using IndentLet. It is also used for maps.
 	indentBindings
@@ -463,14 +511,14 @@ var defaultIndents = map[string]IndentStyle{
 	"deftest":         IndentListBody,
 	"deftest-":        IndentListBody,
 	"deftype":         IndentDeftype,
-	"doseq":           IndentListBody,
+	"doseq":           IndentFor,
 	"dotimes":         IndentLet,
 	"doto":            IndentListBody,
 	"extend":          IndentListBody,
 	"extend-protocol": IndentDeftype,
 	"extend-type":     IndentDeftype,
 	"fn":              IndentListBody,
-	"for":             IndentListBody,
+	"for":             IndentFor,
 	"if":              IndentListBody,
 	"if-let":          IndentLet,
 	"if-not":          IndentListBody,
@@ -557,6 +605,7 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) in
 				IndentListBody,
 				IndentLet,
 				IndentLetfn,
+				IndentFor,
 				IndentDeftype:
 				if i == 1 {
 					w++
