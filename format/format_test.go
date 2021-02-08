@@ -38,6 +38,7 @@ func TestFixture(t *testing.T) {
 		"issue49",
 		"issue55",
 		"issue67",
+		"issue77",
 		"indent_for",
 		"issue80",
 	} {

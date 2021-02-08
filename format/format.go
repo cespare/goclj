@@ -336,7 +336,7 @@ func (p *Printer) chooseListIndent(name string) IndentStyle {
 		return style
 	}
 	name = symbolName(name)
-	for _, prefix := range []string{"def", "let", "send-", "with-", "when-"} {
+	for _, prefix := range []string{"def", "let", "with-", "when-"} {
 		if strings.HasPrefix(name, prefix) {
 			return IndentListBody
 		}
@@ -530,6 +530,7 @@ var defaultIndents = map[string]IndentStyle{
 	"ns":              IndentListBody,
 	"proxy":           IndentDeftype,
 	"reify":           IndentDeftype,
+	"send-off":        IndentListBody,
 	"set-test":        IndentListBody,
 	"testing":         IndentListBody,
 	"update":          IndentListBody,

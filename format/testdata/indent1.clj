@@ -7,7 +7,7 @@
 (locking x
   (dotimes [n 1000]
     (with-redefs [y z]
-      (send-foo 1
+      (send-off 1
         (with-bar 2
           (delete 3
                   (x/up 4
