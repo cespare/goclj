@@ -18,12 +18,25 @@ func (p *Printer) markDocstrings(n parse.Node) {
 	if !goclj.Symbol(nodes[1]) {
 		return
 	}
+	var docstring *parse.StringNode
 	for _, node := range nodes[2:] {
-		if s, ok := node.(*parse.StringNode); ok {
-			p.docstrings[s] = struct{}{}
+		if goclj.Newline(node) {
+			continue
+		}
+		// Once we've found what looks like a docstring, we need to keep
+		// going to ensure that there is something else inside this
+		// form. Otherwise what we found is not a docstring:
+		//
+		//   (def s "this is not a docstring")
+		//   (def s "this is a docstring" "x")
+		//
+		if docstring != nil {
+			p.docstrings[docstring] = struct{}{}
 			return
 		}
-		if !goclj.Newline(node) {
+		if s, ok := node.(*parse.StringNode); ok {
+			docstring = s
+		} else {
 			return
 		}
 	}
