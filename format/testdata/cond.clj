@@ -15,3 +15,59 @@
     (assoc :foo 1
            :bar
              234))
+
+(condp some x #{0 1} "0 or 1" #{2 3} "two or three" #{4 5} :>> #(str "found " % \"))
+(condp some x #{0 1} "0 or 1" #{2 3} "two or three" #{4 5} :>>
+    #(str "found " % \"))
+(condp some x #{0 1} "0 or 1" #{2 3} "two or three" #{4 5}
+    :>>
+    #(str "found " % \"))
+(condp some x #{0 1} "0 or 1" #{2 3} "two or three"
+  #{4 5}
+    :>>
+    #(str "found " % \"))
+(condp some x #{0 1} "0 or 1" #{2 3}
+    "two or three"
+  #{4 5}
+    :>>
+    #(str "found " % \"))
+(condp some x #{0 1} "0 or 1"
+  #{2 3}
+    "two or three"
+  #{4 5}
+    :>>
+    #(str "found " % \"))
+(condp some x #{0 1}
+    "0 or 1"
+  #{2 3}
+    "two or three"
+  #{4 5}
+    :>>
+    #(str "found " % \"))
+(condp some x
+  #{0 1}
+    "0 or 1"
+  #{2 3}
+    "two or three"
+  #{4 5}
+    :>>
+    #(str "found " % \"))
+(condp some
+  x
+  #{0 1}
+    "0 or 1"
+  #{2 3}
+    "two or three"
+  #{4 5}
+    :>>
+    #(str "found " % \"))
+(condp
+  some
+  x
+  #{0 1}
+    "0 or 1"
+  #{2 3}
+    "two or three"
+  #{4 5}
+    :>>
+    #(str "found " % \"))

@@ -260,11 +260,7 @@ func (p *Printer) applySpecialForLet(nodes []parse.Node) {
 		if i%2 != 0 {
 			continue
 		}
-		if k, ok := node.(*parse.KeywordNode); ok {
-			if k.Val == ":let" {
-				prevLet = true
-			}
-		}
+		prevLet = isKeywordNode(node, ":let")
 	}
 }
 
@@ -460,6 +456,9 @@ const (
 	//       foo
 	//     (> a 5)
 	//       bar)
+	// As a special case, to account for condp, when the symbol :>> occurs
+	// in an even-numbered position, the parity of the subsequent arguments
+	// is offset by one.
 	IndentCond0
 	// IndentCond1 is like IndentCond0 except that it ignores 1 body
 	// parameter.
@@ -589,16 +588,46 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) in
 		needSpace  = false
 		needIndent = false
 
-		// used for IndentList and IndentCond0,
-		// for tracking indent based on nodes[0]
+		// firstIndent and firstLen are used for IndentList and IndentCondX
+		// for tracking indent based on nodes[0].
 		firstIndent int
 		firstLen    int
 
-		// used by indentBindings, indexCond, indexCase, and indexCondp
-		// for counting semantic tokens
-		idxSemantic int
+		// pairStartIdx says how many nodes precede the paired elements
+		// in forms such as cond.
+		pairStartIdx = indentExtraOffsets[style]
+
+		// semanticIdx counts the number of semantic nodes we've
+		// printed.
+		semanticIdx int
+
+		// pairIdx is used for forms with paired elements (IndentList
+		// and IndentCondX). It indicates the index of paired elements
+		// after we reach them (once semanticIdx reaches pairStartIdx).
+		// Before that point, it is -1.
+		//
+		// As a special case, the symbol :>> (used by condp) is part of
+		// a triple (rather than a pair) of nodes.
+		//
+		// Here are example values of pairIdx:
+		//
+		// (condp         ; -1
+		//    some        ; -1
+		//    [1 2 3 4]   ; -1
+		//    #{0 6 7}    ; 0
+		//      :>>       ; 1
+		//      inc       ; 2
+		//    #{4 5 9}    ; 0
+		//      123)      ; 1
+		pairIdx int
+
+		// If we had a newline during a paired element, extraIndent
+		// indicates this so that we can remove the indent afterward.
 		extraIndent = false
 	)
+	if pairStartIdx > 0 {
+		pairIdx = -1
+	}
 	for i, n := range nodes {
 		if goclj.Newline(n) {
 			switch style {
@@ -616,21 +645,11 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) in
 				IndentCond1,
 				IndentCond2,
 				IndentCond4:
-				off := indentExtraOffsets[style]
-				if idxSemantic >= 1 && idxSemantic <= off {
-					// Fall back to IndentListBody in this case.
-					// Example:
-					// (case
-					//    foo
-					//    "a" b)
-					// The 'foo' is indented like IndentListBody.
-					if i == 1 {
-						w++
-					}
-				}
-				if idxSemantic > off && (idxSemantic-off)%2 == 1 {
+				if pairIdx > 0 {
 					w += 2
 					extraIndent = true
+				} else if i == 1 && semanticIdx == 1 {
+					w++
 				}
 			}
 			w2 = w
@@ -639,10 +658,9 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) in
 			needSpace = false
 			continue
 		}
+
 		semantic := goclj.Semantic(n)
-		if semantic {
-			idxSemantic++
-		}
+
 		switch style {
 		case IndentList, IndentCond0:
 			if i == 1 {
@@ -675,6 +693,19 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) in
 			w -= 2
 			extraIndent = false
 		}
+
+		if !semantic {
+			continue
+		}
+		semanticIdx++
+		if pairIdx >= 0 {
+			pairIdx++
+		}
+
+		if semanticIdx == pairStartIdx ||
+			(pairIdx == 2 && !isKeywordNode(n, ":>>")) || pairIdx > 2 {
+			pairIdx = 0
+		}
 	}
 	// We need to put in a trailing indent here; the next token cannot be a
 	// newline (it will need to be the closing delimiter for this sequence).
@@ -682,6 +713,14 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) in
 		p.WriteString(strings.Repeat(string(p.IndentChar), w))
 	}
 	return w2
+}
+
+func isKeywordNode(n parse.Node, kw string) bool {
+	kn, ok := n.(*parse.KeywordNode)
+	if !ok {
+		return false
+	}
+	return kn.Val == kw
 }
 
 type bufWriter struct {
