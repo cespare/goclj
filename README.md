@@ -48,6 +48,23 @@ way (typically by running tests).
 
 Sort :import and :require declarations in ns blocks.
 
+### enforce-ns-style (default: on)
+
+Apply a few common `ns` style rules (based on [How to ns]):
+
+* Clauses use keywords (`:require`) rather than symbols (`require`)
+* Clauses are lists (`(:require ...)`) rather than vectors (`[:require ...]`)
+* There is a newline after `:require` or `:import`
+* For `:require` specifically:
+  - Each `require` is written as a vector, not a list
+  - Each `require`d namespace is written inside a vector (not a plain symbol)
+  - `:refer`ed and `:exclude`d items use vectors, not lists
+* For `:import` specifically:
+  - Each `import` is written as a list, not a vector
+  - Plain symbols become lists (`java.util.Date` becomes `(java.util Date)`)
+
+[How to ns]: https://stuartsierra.com/2016/clojure-how-to-ns.html
+
 ### remove-trailing-newlines (default: on)
 
 Remove extra newlines following sequence-like forms, so that parentheses are written on the same

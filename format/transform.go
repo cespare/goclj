@@ -2,6 +2,7 @@ package format
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/cespare/goclj"
 	"github.com/cespare/goclj/parse"
@@ -17,6 +18,15 @@ const (
 	// TransformSortImportRequire sorts :import, :require, and :require-macros
 	// declarations in ns blocks.
 	TransformSortImportRequire Transform = iota
+
+	// TransformEnforceNSStyle applies a few common ns style rules based on
+	// "How to ns". See the README for a list of the rules.
+	//
+	// TODO: add more "How to ns" conventions such as sorting the vectors
+	// within a :require clause. See
+	// https://github.com/cespare/goclj/pull/85#issuecomment-777754824
+	// for a discussion about this.
+	TransformEnforceNSStyle
 
 	// TransformRemoveTrailingNewlines removes extra newlines following
 	// sequence-like forms, so that parentheses are written on the same
@@ -100,6 +110,7 @@ const (
 
 var DefaultTransforms = map[Transform]bool{
 	TransformSortImportRequire:              true,
+	TransformEnforceNSStyle:                 true,
 	TransformRemoveTrailingNewlines:         true,
 	TransformFixDefnArglistNewline:          true,
 	TransformFixDefmethodDispatchValNewline: true,
@@ -119,6 +130,9 @@ func applyTransforms(t *parse.Tree, transforms map[Transform]bool) {
 			}
 			if transforms[TransformRemoveUnusedRequires] {
 				removeUnusedRequires(root, syms)
+			}
+			if transforms[TransformEnforceNSStyle] {
+				enforceNSStyle(root)
 			}
 			if transforms[TransformSortImportRequire] {
 				sortNS(root)
@@ -196,7 +210,7 @@ func removeUnusedRequires(ns parse.Node, syms *symbolCache) {
 			}
 		}
 		requires := rl.render()[0]
-		if len(requires.Children()) == 1 {
+		if len(requires.Children()) <= 2 {
 			// If all that's left is (:require), drop it.
 			// If there's a newline afterwards, drop that too.
 			if i < len(children)-1 && goclj.Newline(children[i+1]) {
@@ -207,6 +221,108 @@ func removeUnusedRequires(ns parse.Node, syms *symbolCache) {
 		}
 	}
 	ns.SetChildren(nodes)
+}
+
+func enforceNSStyle(ns parse.Node) {
+	children := ns.Children()
+	for i := 1; i < len(children); i++ {
+		n := children[i]
+		var isVec bool
+		switch n.(type) {
+		case *parse.ListNode:
+		case *parse.VectorNode:
+			isVec = true
+		default:
+			continue
+		}
+		clauseChildren := n.Children()
+		if len(clauseChildren) == 0 {
+			continue
+		}
+		var clause string
+		var isSym bool
+		switch c := clauseChildren[0].(type) {
+		case *parse.KeywordNode:
+			clause = c.Val[1:]
+		case *parse.SymbolNode:
+			clause = c.Val
+			isSym = true
+		default:
+			continue
+		}
+		multipleArgs := false
+		switch clause {
+		case "refer-clojure":
+		case "require", "require-macros", "use", "import", "load", "gen-class":
+			multipleArgs = true
+		default:
+			continue
+		}
+		if isSym {
+			clauseChildren[0] = &parse.KeywordNode{Val: ":" + clause}
+		}
+		if multipleArgs && len(clauseChildren) >= 2 && goclj.Semantic(clauseChildren[1]) {
+			clauseChildren = append(
+				[]parse.Node{clauseChildren[0], newline},
+				clauseChildren[1:]...,
+			)
+		}
+		switch clause {
+		case "require", "require-macros":
+			enforceRequireStyle(clauseChildren)
+		case "import":
+			enforceImportStyle(clauseChildren)
+		}
+		n.SetChildren(clauseChildren)
+		if isVec {
+			n = &parse.ListNode{Nodes: n.Children()}
+		}
+		children[i] = n
+	}
+	ns.SetChildren(children)
+}
+
+func enforceRequireStyle(nodes []parse.Node) {
+	for i, n := range nodes {
+		var v *parse.VectorNode
+		switch n := n.(type) {
+		case *parse.ListNode:
+			v = &parse.VectorNode{Nodes: n.Nodes}
+		case *parse.SymbolNode:
+			v = &parse.VectorNode{Nodes: []parse.Node{n}}
+		case *parse.VectorNode:
+			v = n
+		}
+		if v == nil {
+			continue
+		}
+		for i, child := range v.Nodes {
+			if l, ok := child.(*parse.ListNode); ok {
+				v.Nodes[i] = &parse.VectorNode{Nodes: l.Nodes}
+			}
+		}
+		nodes[i] = v
+	}
+}
+
+func enforceImportStyle(nodes []parse.Node) {
+	for i, n := range nodes {
+		switch n := n.(type) {
+		case *parse.VectorNode:
+			nodes[i] = &parse.ListNode{Nodes: n.Nodes}
+		case *parse.SymbolNode:
+			j := strings.LastIndexByte(n.Val, '.')
+			if j < 0 {
+				break
+			}
+			nodes[i] = &parse.ListNode{
+				Nodes: []parse.Node{
+					&parse.SymbolNode{Val: n.Val[:j]},
+					&parse.SymbolNode{Val: n.Val[j+1:]},
+				},
+			}
+		}
+	}
 }
 
 func sortNS(ns parse.Node) {
@@ -222,9 +338,10 @@ func sortImportRequire(n *parse.ListNode) {
 		nodes             = n.Children()
 		sorted            = make(importRequireList, 0, len(nodes)/2)
 		lineComments      []*parse.CommentNode
+		initialNewline    = false
 		afterSemanticNode = false
 	)
-	for _, node := range nodes[1:] {
+	for i, node := range nodes[1:] {
 		switch node := node.(type) {
 		case *parse.CommentNode:
 			if afterSemanticNode {
@@ -233,6 +350,9 @@ func sortImportRequire(n *parse.ListNode) {
 				lineComments = append(lineComments, node)
 			}
 		case *parse.NewlineNode:
+			if i == 0 {
+				initialNewline = true
+			}
 			afterSemanticNode = false
 		default:
 			ir := &importRequire{
@@ -246,19 +366,22 @@ func sortImportRequire(n *parse.ListNode) {
 	}
 	sort.Stable(sorted)
 	newNodes := []parse.Node{nodes[0]}
+	if initialNewline {
+		newNodes = append(newNodes, newline)
+	}
 	for _, ir := range sorted {
 		for _, cn := range ir.commentsAbove {
-			newNodes = append(newNodes, cn, &parse.NewlineNode{})
+			newNodes = append(newNodes, cn, newline)
 		}
 		newNodes = append(newNodes, ir.node)
 		if ir.commentBeside != nil {
 			newNodes = append(newNodes, ir.commentBeside)
 		}
-		newNodes = append(newNodes, &parse.NewlineNode{})
+		newNodes = append(newNodes, newline)
 	}
 	// unattached comments at the bottom
 	for _, cn := range lineComments {
-		newNodes = append(newNodes, cn, &parse.NewlineNode{})
+		newNodes = append(newNodes, cn, newline)
 	}
 	// drop trailing newline
 	if len(newNodes) >= 2 && !goclj.Comment(newNodes[len(newNodes)-2]) {

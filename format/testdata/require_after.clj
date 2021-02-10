@@ -1,10 +1,12 @@
 (ns foo.bar
-  (:require ; a
-            [a :refer [x y z]] ; blah
-            ; z
-            (z :as z) ; another
-            ; after
-            )
-  (:import java.io.DataInputStream
-           java.io.File
-           [java.util.zip GZIPInputStream]))
+  (:require
+    ; a
+    [a :refer [x y z]] ; blah
+    ; z
+    [z :as z] ; another
+    ; after
+    )
+  (:import
+    (java.io File)
+    (java.io DataInputStream)
+    (java.util.zip GZIPInputStream)))

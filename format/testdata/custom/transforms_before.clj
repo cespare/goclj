@@ -1,6 +1,7 @@
 (ns a
-  (:require z
-            a))
+  (:require
+    [z]
+    [a]))
 
 
 (defn foo

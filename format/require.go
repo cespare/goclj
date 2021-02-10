@@ -261,6 +261,7 @@ func (rl *requireList) render() []parse.Node {
 	} else {
 		nodes = append(nodes, &parse.KeywordNode{Val: ":require"})
 	}
+	nodes = append(nodes, newline)
 	for _, r := range rl.m {
 		for _, c := range r.comments.commentsAbove {
 			nodes = append(nodes, c, newline)

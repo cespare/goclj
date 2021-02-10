@@ -38,6 +38,15 @@ func TestChange(t *testing.T) {
 	}
 }
 
+func TestTransformsEnforceNSStyle(t *testing.T) {
+	testChangeTransforms(
+		t,
+		"transform/nsstyle_before.clj",
+		"transform/nsstyle_after.clj",
+		map[Transform]bool{TransformEnforceNSStyle: true},
+	)
+}
+
 func TestTransformsUseToRequire(t *testing.T) {
 	testChangeTransforms(
 		t,

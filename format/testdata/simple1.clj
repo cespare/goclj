@@ -1,6 +1,7 @@
 (ns foo.bar
-  (:require [clojure.set :as set]
-            [clojure.string :as string]))
+  (:require
+    [clojure.set :as set]
+    [clojure.string :as string]))
 
 (defn throw-str
   "Throws a RuntimeException, str-ing together its arguments."

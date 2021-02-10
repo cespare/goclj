@@ -1,5 +1,6 @@
 (ns a
-  (:import [foo.bar Baz]))
+  (:import
+    (foo.bar Baz)))
 
 (xyz)
 (Baz.)

@@ -1,8 +1,10 @@
 (ns myns
-  (:require [org.lib1
-             :as lib2]
-            [org.lib3 :refer [mycond] :refer-macros [mymacro1]])
-  (:require-macros [org.lib4 :refer [mymacro2]]))
+  (:require
+    [org.lib1
+     :as lib2]
+    [org.lib3 :refer [mycond] :refer-macros [mymacro1]])
+  (:require-macros
+    [org.lib4 :refer [mymacro2]]))
 
 (locking x
   (dotimes [n 1000]

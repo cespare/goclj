@@ -95,6 +95,8 @@ func (tf transformFlag) Set(v string) error {
 	switch v {
 	case "sort-import-require":
 		t = format.TransformSortImportRequire
+	case "enforce-ns-style":
+		t = format.TransformEnforceNSStyle
 	case "remove-trailing-newlines":
 		t = format.TransformRemoveTrailingNewlines
 	case "fix-defn-arglist-newline":
