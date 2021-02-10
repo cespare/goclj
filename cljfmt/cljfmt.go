@@ -103,6 +103,8 @@ func (tf transformFlag) Set(v string) error {
 		t = format.TransformFixDefmethodDispatchValNewline
 	case "remove-extra-blank-lines":
 		t = format.TransformRemoveExtraBlankLines
+	case "fix-if-newline-consistency":
+		t = format.TransformFixIfNewlineConsistency
 	case "use-to-require":
 		t = format.TransformUseToRequire
 	case "remove-unused-requires":

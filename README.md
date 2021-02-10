@@ -48,7 +48,6 @@ way (typically by running tests).
 
 Sort :import and :require declarations in ns blocks.
 
-
 ### remove-trailing-newlines (default: on)
 
 Remove extra newlines following sequence-like forms, so that parentheses are written on the same
@@ -91,6 +90,23 @@ becomes
 ### remove-extra-blank-lines (default: on)
 
 Consolidate consecutive blank lines into a single blank line.
+
+### fix-if-newline-consistency (default: on)
+
+Ensure that if one arm of an `if` is on its own line, the other is as well.
+Either of these:
+
+    (if foo? a
+      b)
+
+    (if foo?
+      a b)
+
+become
+
+    (if foo?
+      a
+      b)
 
 ### use-to-require (default: off)
 

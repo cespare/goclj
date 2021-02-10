@@ -21,45 +21,80 @@ const (
 	// TransformRemoveTrailingNewlines removes extra newlines following
 	// sequence-like forms, so that parentheses are written on the same
 	// line. For example,
+	//
 	//   (foo bar
 	//    )
+	//
 	// becomes
+	//
 	//   (foo bar)
+	//
 	TransformRemoveTrailingNewlines
 
 	// TransformFixDefnArglistNewline moves the arg vector of defns to the
 	// same line, if appropriate:
+	//
 	//   (defn foo
 	//     [x] ...)
+	//
 	// becomes
+	//
 	//   (defn foo [x]
 	//     ...)
+	//
 	// if there's no newline after the arg list.
 	TransformFixDefnArglistNewline
 
 	// TransformFixDefmethodDispatchValNewline moves the dispatch-val of a
 	// defmethod to the same line, so that
+	//
 	//   (defmethod foo
 	//     :bar
 	//     [x] ...)
+	//
 	// becomes
+	//
 	//   (defmethod foo :bar
 	//     [x] ...)
+	//
 	TransformFixDefmethodDispatchValNewline
 
 	// TransformRemoveExtraBlankLines consolidates consecutive blank lines
 	// into a single blank line.
 	TransformRemoveExtraBlankLines
 
+	// TransformFixIfNewlineConsistency ensures that if one arm of an if
+	// expression is preceded by a newline, the other arm is as well.
+	// Both of these:
+	//
+	//   (if foo? a
+	//     b)
+	//   (if foo?
+	//     a b)
+	//
+	// become
+	//
+	//   (if foo?
+	//     a
+	//     b)
+	//
+	// This applies to similar forms and macros such as if-not, if-let, and
+	// so on. One-line expressions such as (if foo? a b) are not affected.
+	TransformFixIfNewlineConsistency
+
 	// TransformUseToRequire consolidates :require and :use blocks inside ns
 	// declarations, rewriting them using :require if possible.
+	//
 	// It is not enabled by default.
 	TransformUseToRequire
 
 	// TransformRemoveUnusedRequires uses some simple heuristics to remove
 	// some unused :require statements:
+	//
 	//   [foo :as x] ; if there is no x/y in the ns, this is removed
 	//   [foo :refer [x]] ; if x does not appear in the ns, this is removed
+	//
+	// It is not enabled by default.
 	TransformRemoveUnusedRequires
 )
 
@@ -69,6 +104,7 @@ var DefaultTransforms = map[Transform]bool{
 	TransformFixDefnArglistNewline:          true,
 	TransformFixDefmethodDispatchValNewline: true,
 	TransformRemoveExtraBlankLines:          true,
+	TransformFixIfNewlineConsistency:        true,
 }
 
 func applyTransforms(t *parse.Tree, transforms map[Transform]bool) {
@@ -100,7 +136,10 @@ func applyTransforms(t *parse.Tree, transforms map[Transform]bool) {
 			fixDefmethodDispatchVal(root)
 		}
 		if transforms[TransformRemoveExtraBlankLines] {
-			removeExtraBlankLinesRecursive(root)
+			removeExtraBlankLinesRec(root)
+		}
+		if transforms[TransformFixIfNewlineConsistency] {
+			enforceConsistentIfNewlinesRec(root)
 		}
 	}
 	if transforms[TransformRemoveExtraBlankLines] {
@@ -287,7 +326,7 @@ func fixDefmethodDispatchVal(defmethod parse.Node) {
 	defmethod.SetChildren(nodes)
 }
 
-func removeExtraBlankLinesRecursive(n parse.Node) {
+func removeExtraBlankLinesRec(n parse.Node) {
 	nodes := n.Children()
 	if len(nodes) == 0 {
 		return
@@ -297,7 +336,7 @@ func removeExtraBlankLinesRecursive(n parse.Node) {
 		n.SetChildren(nodes)
 	}
 	for _, node := range nodes {
-		removeExtraBlankLinesRecursive(node)
+		removeExtraBlankLinesRec(node)
 	}
 }
 
@@ -315,6 +354,69 @@ func removeExtraBlankLines(nodes []parse.Node) []parse.Node {
 		}
 	}
 	return newNodes
+}
+
+func enforceConsistentIfNewlinesRec(n parse.Node) {
+	if goclj.FnFormSymbol(n, "if", "if-not", "if-some", "if-let") {
+		n.SetChildren(enforceConsistentIfNewlines(n.Children()))
+	}
+	for _, child := range n.Children() {
+		enforceConsistentIfNewlinesRec(child)
+	}
+}
+
+func enforceConsistentIfNewlines(nodes []parse.Node) []parse.Node {
+	var arm0, arm1 int
+	var newlineBeforeArm0, newlineBeforeArm1 bool
+	var foundTest bool
+	i := 1
+	for ; i < len(nodes); i++ {
+		n := nodes[i]
+		if !goclj.Semantic(n) {
+			if goclj.Newline(n) {
+				newlineBeforeArm0 = true
+			}
+			continue
+		}
+		if !foundTest {
+			foundTest = true
+			continue
+		}
+		arm0 = i
+		break
+	}
+	i++
+	for ; i < len(nodes); i++ {
+		n := nodes[i]
+		if !goclj.Semantic(n) {
+			if goclj.Newline(n) {
+				newlineBeforeArm1 = true
+			}
+			continue
+		}
+		arm1 = i
+		break
+	}
+	if arm1 == 0 { // only one arm
+		return nodes
+	}
+	if newlineBeforeArm0 && !newlineBeforeArm1 {
+		// (if x?
+		//   a b)
+		return append(
+			nodes[:arm1],
+			append([]parse.Node{new(parse.NewlineNode)}, nodes[arm1:]...)...,
+		)
+	}
+	if !newlineBeforeArm0 && newlineBeforeArm1 {
+		// (if x? a
+		//   b)
+		return append(
+			nodes[:arm0],
+			append([]parse.Node{new(parse.NewlineNode)}, nodes[arm0:]...)...,
+		)
+	}
+	return nodes
 }
 
 // An importRequire is an import/require with associated comment nodes.

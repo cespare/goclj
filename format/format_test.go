@@ -96,6 +96,15 @@ func TestTransformsRemoveUnusedRequiresEmpty(t *testing.T) {
 	)
 }
 
+func TestTransformsFixIfNewlineConsistency(t *testing.T) {
+	testChangeTransforms(
+		t,
+		"transform/ifnewlines_before.clj",
+		"transform/ifnewlines_after.clj",
+		map[Transform]bool{TransformFixIfNewlineConsistency: true},
+	)
+}
+
 func TestCustomIndent(t *testing.T) {
 	const file0 = "indent1.clj"
 	const file1 = "indent1_custom.clj"
