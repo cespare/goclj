@@ -6,42 +6,20 @@ import (
 	"io/ioutil"
 	"math"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/cespare/goclj/parse"
 )
 
 func TestFixture(t *testing.T) {
-	for _, fixture := range []string{
-		"simple1",
-		"let",
-		"map",
-		"nsmap",
-		"deftype",
-		"listbody",
-		"threadfirst",
-		"cond",
-		"indent",
-		"readercond",
-		"issue5",
-		"issue8",
-		"issue9",
-		"issue14",
-		"issue15",
-		"issue16",
-		"issue17",
-		"issue18",
-		"issue19",
-		"issue21",
-		"issue23",
-		"issue49",
-		"issue55",
-		"issue67",
-		"issue77",
-		"indent_for",
-		"issue80",
-	} {
+	fixtures, _ := loadFixtures(t)
+	if len(fixtures) < 5 {
+		t.Fatal("failed to load fixtures")
+	}
+	for _, fixture := range fixtures {
 		t.Run(fixture, func(t *testing.T) {
 			testFixture(t, fixture+".clj")
 		})
@@ -49,17 +27,11 @@ func TestFixture(t *testing.T) {
 }
 
 func TestChange(t *testing.T) {
-	for _, fixture := range []string{
-		"styleguide",
-		"newline",
-		"require",
-		"issue6",
-		"issue7",
-		"issue25",
-		"issue26",
-		"issue32",
-		"issue37",
-	} {
+	_, fixtures := loadFixtures(t)
+	if len(fixtures) < 5 {
+		t.Fatal("failed to load fixtures")
+	}
+	for _, fixture := range fixtures {
 		t.Run(fixture, func(t *testing.T) {
 			testChange(t, fixture+"_before.clj", fixture+"_after.clj")
 		})
@@ -69,8 +41,8 @@ func TestChange(t *testing.T) {
 func TestTransformsUseToRequire(t *testing.T) {
 	testChangeTransforms(
 		t,
-		"transform/use2require_before.clj",
-		"transform/use2require_after.clj",
+		"custom/use2require_before.clj",
+		"custom/use2require_after.clj",
 		map[Transform]bool{TransformUseToRequire: true},
 	)
 }
@@ -78,8 +50,8 @@ func TestTransformsUseToRequire(t *testing.T) {
 func TestTransformsRemoveUnusedRequires(t *testing.T) {
 	testChangeTransforms(
 		t,
-		"transform/unusedrequires_before.clj",
-		"transform/unusedrequires_after.clj",
+		"custom/unusedrequires_before.clj",
+		"custom/unusedrequires_after.clj",
 		map[Transform]bool{
 			TransformUseToRequire:         true,
 			TransformRemoveUnusedRequires: true,
@@ -90,8 +62,8 @@ func TestTransformsRemoveUnusedRequires(t *testing.T) {
 func TestTransformsRemoveUnusedRequiresEmpty(t *testing.T) {
 	testChangeTransforms(
 		t,
-		"transform/unusedrequiresempty_before.clj",
-		"transform/unusedrequiresempty_after.clj",
+		"custom/unusedrequiresempty_before.clj",
+		"custom/unusedrequiresempty_after.clj",
 		map[Transform]bool{TransformRemoveUnusedRequires: true},
 	)
 }
@@ -99,15 +71,15 @@ func TestTransformsRemoveUnusedRequiresEmpty(t *testing.T) {
 func TestTransformsFixIfNewlineConsistency(t *testing.T) {
 	testChangeTransforms(
 		t,
-		"transform/ifnewlines_before.clj",
-		"transform/ifnewlines_after.clj",
+		"custom/ifnewlines_before.clj",
+		"custom/ifnewlines_after.clj",
 		map[Transform]bool{TransformFixIfNewlineConsistency: true},
 	)
 }
 
 func TestCustomIndent(t *testing.T) {
-	const file0 = "indent1.clj"
-	const file1 = "indent1_custom.clj"
+	const file0 = "custom/indent1.clj"
+	const file1 = "custom/indent1_custom.clj"
 	testFixture(t, file0)
 
 	f := func(p *Printer) {
@@ -124,16 +96,19 @@ func TestCustomIndent(t *testing.T) {
 }
 
 func TestCustomTransforms(t *testing.T) {
-	const before = "transforms_before.clj"
-	const after = "transforms_after.clj"
-	testChangeTransforms(t, before, after, map[Transform]bool{
-		TransformSortImportRequire:     false,
-		TransformFixDefnArglistNewline: false,
-	})
+	testChangeTransforms(
+		t,
+		"custom/transforms_before.clj",
+		"custom/transforms_after.clj",
+		map[Transform]bool{
+			TransformSortImportRequire:     false,
+			TransformFixDefnArglistNewline: false,
+		},
+	)
 }
 
 func TestIssue41(t *testing.T) {
-	const file = "issue41.clj"
+	const file = "custom/issue41.clj"
 	f := func(p *Printer) {
 		p.IndentOverrides = map[string]IndentStyle{
 			"cond-blah-blah-blah": IndentCond0,
@@ -216,4 +191,55 @@ func formatLines(contents string) string {
 		b.WriteRune('\n')
 	}
 	return b.String()
+}
+
+var (
+	fixturesOnce   sync.Once
+	fixturesErr    error
+	singleFixtures []string
+	changeFixtures []string
+)
+
+func loadFixtures(t *testing.T) (singles, changes []string) {
+	t.Helper()
+	fixturesOnce.Do(func() { fixturesErr = loadFixturesOnce() })
+	if fixturesErr != nil {
+		t.Fatalf("error loading fixtures: %s", fixturesErr)
+	}
+	return singleFixtures, changeFixtures
+}
+
+func loadFixturesOnce() error {
+	paths, err := filepath.Glob("testdata/*.clj")
+	if err != nil {
+		return err
+	}
+	befores := make(map[string]struct{})
+	afters := make(map[string]struct{})
+	for _, path := range paths {
+		name := strings.TrimSuffix(filepath.Base(path), ".clj")
+		if n := strings.TrimSuffix(name, "_before"); n != name {
+			befores[n] = struct{}{}
+			continue
+		}
+		if n := strings.TrimSuffix(name, "_after"); n != name {
+			afters[n] = struct{}{}
+			continue
+		}
+		singleFixtures = append(singleFixtures, name)
+	}
+	for name := range befores {
+		if _, ok := afters[name]; !ok {
+			return fmt.Errorf("found %s_before.clj but no %[1]s_after.clj", name)
+		}
+		delete(afters, name)
+		changeFixtures = append(changeFixtures, name)
+	}
+	for name := range afters {
+		return fmt.Errorf("found %s_after.clj but no %[1]s_before.clj", name)
+	}
+
+	sort.Strings(singleFixtures)
+	sort.Strings(changeFixtures)
+	return nil
 }
