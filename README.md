@@ -199,6 +199,20 @@ Examples of builtins that use `:let` by default are `binding`, `dotimes`,
   (* x y))
 ```
 
+**:for** is for for-like forms. This is similar to `:let`, but
+additionally it supports having a `:let` clause with let-like binding vector
+formatted accordingly.
+
+Examples of builtins that use `:for` by default are `for`, and `doseq`.
+
+``` clojure
+(for [x
+        (range 5)
+      :let [y
+              (- 100 x)]
+  (* x y))
+```
+
 **:letfn** is used for indenting letfn, where the binding vector contains
 function bodies that themselves should be indented as `:list-body`.
 
