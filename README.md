@@ -177,7 +177,7 @@ aligned under the second element of the list.
 indented by two spaces.
 
 Examples of builtins which use `:list-body` indentation by default are `fn`,
-`for`, `when`, and most macros beginning with `def`.
+`when`, and most macros beginning with `def`.
 
 ``` clojure
 (when-not (zero? x)
@@ -203,7 +203,7 @@ Examples of builtins that use `:let` by default are `binding`, `dotimes`,
 additionally it supports having a `:let` clause with let-like binding vector
 formatted accordingly.
 
-Examples of builtins that use `:for` by default are `for`, and `doseq`.
+The builtins that use `:for` by default are `for` and `doseq`.
 
 ``` clojure
 (for [x
