@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -68,6 +69,45 @@ func TestAll(t *testing.T) {
 			continue
 		}
 	}
+}
+
+func TestParentPointers(t *testing.T) {
+	for _, tc := range []struct {
+		s     string
+		child string
+		want  string
+	}{
+		{"a", "sym(a)", "<nil>"},
+		{"(a b)", "sym(b)", "list(length=2)"},
+		{"(a {b c})", "sym(b)", "map(length=1)"},
+		{"'a", "sym(a)", "quote"},
+	} {
+		tree, err := Reader(strings.NewReader(tc.s), "temp", IncludeNonSemantic)
+		if err != nil {
+			t.Fatalf("error parsing %q: %s", tc.s, err)
+		}
+		child := walkFindNode(tree.Roots, tc.child)
+		if child == nil {
+			t.Errorf("for %q: child %s not found", tc.s, tc.child)
+			continue
+		}
+		if got := fmt.Sprint(child.Parent()); got != tc.want {
+			t.Errorf("for %q: got parent %s, want %s", tc.s, got, tc.want)
+			continue
+		}
+	}
+}
+
+func walkFindNode(nodes []Node, target string) Node {
+	for _, n := range nodes {
+		if n.String() == target {
+			return n
+		}
+		if m := walkFindNode(n.Children(), target); m != nil {
+			return m
+		}
+	}
+	return nil
 }
 
 func TestIgnoreReaderDiscard(t *testing.T) {
