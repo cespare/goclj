@@ -125,6 +125,8 @@ const (
 	// CommentNodes and NewlineNodes.
 	IncludeNonSemantic ParseOpts = 1 << iota
 	// IgnoreCommentForm makes the parser ignore (comment ...) forms.
+	// This only applies to forms that are semantic comments; a quoted node
+	// such as '(comment "foo") would not be ignored.
 	IgnoreCommentForm
 	// IgnoreReaderDiscard makes the parser ignore forms preceded by #_.
 	IgnoreReaderDiscard

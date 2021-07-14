@@ -137,6 +137,7 @@ func TestIgnoreCommentForm(t *testing.T) {
 		want string
 	}{
 		{"(comment 1 2 3)", ""},
+		{"'(comment 1)", "quote list(length=2) sym(comment) num(1)"},
 		{"a (comment 1) b", "sym(a) sym(b)"},
 		{"[a b (comment 1)]", "vector(length=2) sym(a) sym(b)"},
 	} {
