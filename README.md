@@ -1,9 +1,11 @@
 # goclj
 
-> Go tools for working with Clojure code.
+**Go tools for working with Clojure code.**
 
-The parse ([GoDoc](http://godoc.org/github.com/cespare/goclj/parse)) and format
-([GoDoc](http://godoc.org/github.com/cespare/goclj/format)) packages implement
+[![Go Reference](https://pkg.go.dev/badge/github.com/cespare/goclj.svg)](https://pkg.go.dev/github.com/cespare/goclj)
+
+The parse ([doc](https://pkg.go.dev/github.com/cespare/goclj/parse)) and format
+([doc](https://pkg.go.dev/github.com/cespare/goclj/format)) packages implement
 Clojure code parsing and (formatted) printing, respectively.
 
 cljfmt is a command-line tool (inspired by gofmt) that uses format to read and
@@ -13,8 +15,11 @@ transformations are safe (they cannot change semantics).
 Additionally, cljfmt applies various transformations to the code; these are
 discussed in the **Transforms** section, below.
 
-To install or update, use `go get -u github.com/cespare/goclj/cljfmt`. Here is
-the output of `cljfmt -h`:
+To install or update, run
+
+    go install github.com/cespare/goclj/cljfmt@latest
+
+Here is the output of `cljfmt -h`:
 
 ```
 usage: cljfmt [flags] [paths...]
