@@ -19,6 +19,9 @@ To install or update, run
 
     go install github.com/cespare/goclj/cljfmt@latest
 
+(You'll need Go 1.16+). Alternatively, you can download a clfjmt binary from the
+[Releases page](https://github.com/cespare/goclj/releases).
+
 Here is the output of `cljfmt -h`:
 
 ```
