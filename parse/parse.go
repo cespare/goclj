@@ -101,14 +101,6 @@ func (t *Tree) backup() {
 	}
 }
 
-func (t *Tree) peek() token {
-	if t.peekCount == 0 {
-		t.peekCount++
-		t.tok = t.nextToken()
-	}
-	return t.tok
-}
-
 func (t *Tree) errorf(pos *Pos, format string, args ...interface{}) {
 	panic(parseError{pos.FormatError("parse", fmt.Sprintf(format, args...))})
 }

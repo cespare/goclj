@@ -108,37 +108,37 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 	switch node := node.(type) {
 	case *parse.BoolNode:
 		if node.Val {
-			return w + p.WriteString("true")
+			return w + p.writeString("true")
 		} else {
-			return w + p.WriteString("false")
+			return w + p.writeString("false")
 		}
 	case *parse.CharacterNode:
-		return w + p.WriteString(node.Text)
+		return w + p.writeString(node.Text)
 	case *parse.CommentNode:
-		return w + p.WriteString(node.Text)
+		return w + p.writeString(node.Text)
 	case *parse.DerefNode:
-		w += p.WriteByte('@')
+		w += p.writeByte('@')
 		return p.printNode(node.Node, w)
 	case *parse.FnLiteralNode:
-		w += p.WriteString("#(")
+		w += p.writeString("#(")
 		w = p.printSequence(node.Nodes, w, p.chooseIndent(node.Nodes))
-		return w + p.WriteString(")")
+		return w + p.writeString(")")
 	case *parse.ReaderCondNode:
-		w += p.WriteString("#?(")
+		w += p.writeString("#?(")
 		w = p.printSequence(node.Nodes, w, indentBindings)
-		return w + p.WriteString(")")
+		return w + p.writeString(")")
 	case *parse.ReaderCondSpliceNode:
-		w += p.WriteString("#?@(")
+		w += p.writeString("#?@(")
 		w = p.printSequence(node.Nodes, w, indentBindings)
-		return w + p.WriteString(")")
+		return w + p.writeString(")")
 	case *parse.ReaderDiscardNode:
-		w += p.WriteString("#_")
+		w += p.writeString("#_")
 		return p.printNode(node.Node, w)
 	case *parse.ReaderEvalNode:
-		w += p.WriteString("#=")
+		w += p.writeString("#=")
 		return p.printNode(node.Node, w)
 	case *parse.KeywordNode:
-		return w + p.WriteString(node.Val)
+		return w + p.writeString(node.Val)
 	case *parse.ListNode:
 		p.applySpecialIndentRules(node)
 		var style IndentStyle
@@ -151,57 +151,57 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		if _, ok := p.threadFirst[node]; ok {
 			style = style.threadFirstTransform()
 		}
-		w += p.WriteString("(")
+		w += p.writeString("(")
 		w = p.printSequence(node.Nodes, w, style)
-		return w + p.WriteString(")")
+		return w + p.writeString(")")
 	case *parse.MapNode:
 		if node.Namespace != "" {
-			w += p.WriteString("#")
-			w += p.WriteString(node.Namespace)
+			w += p.writeString("#")
+			w += p.writeString(node.Namespace)
 		}
-		w += p.WriteString("{")
+		w += p.writeString("{")
 		w = p.printSequence(node.Nodes, w, indentBindings)
-		return w + p.WriteString("}")
+		return w + p.writeString("}")
 	case *parse.MetadataNode:
-		w += p.WriteByte('^')
+		w += p.writeByte('^')
 		return p.printNode(node.Node, w)
 	case *parse.NewlineNode:
 		panic("should not happen")
 	case *parse.NilNode:
-		return w + p.WriteString("nil")
+		return w + p.writeString("nil")
 	case *parse.NumberNode:
-		return w + p.WriteString(node.Val)
+		return w + p.writeString(node.Val)
 	case *parse.QuoteNode:
-		w += p.WriteByte('\'')
+		w += p.writeByte('\'')
 		return p.printNode(node.Node, w)
 	case *parse.RegexNode:
-		return w + p.WriteString(`#"`+node.Val+`"`)
+		return w + p.writeString(`#"`+node.Val+`"`)
 	case *parse.SetNode:
-		w += p.WriteString("#{")
+		w += p.writeString("#{")
 		w = p.printSequence(node.Nodes, w, IndentNormal)
-		return w + p.WriteString("}")
+		return w + p.writeString("}")
 	case *parse.StringNode:
 		val := node.Val
 		if _, ok := p.docstrings[node]; ok {
 			val = p.alignDocstring(val, w)
 			delete(p.docstrings, node)
 		}
-		return w + p.WriteString(`"`+val+`"`)
+		return w + p.writeString(`"`+val+`"`)
 	case *parse.SymbolNode:
-		return w + p.WriteString(node.Val)
+		return w + p.writeString(node.Val)
 	case *parse.SyntaxQuoteNode:
-		w += p.WriteByte('`')
+		w += p.writeByte('`')
 		return p.printNode(node.Node, w)
 	case *parse.TagNode:
-		return w + p.WriteString("#"+node.Val)
+		return w + p.writeString("#"+node.Val)
 	case *parse.UnquoteNode:
-		w += p.WriteByte('~')
+		w += p.writeByte('~')
 		return p.printNode(node.Node, w)
 	case *parse.UnquoteSpliceNode:
-		w += p.WriteString("~@")
+		w += p.writeString("~@")
 		return p.printNode(node.Node, w)
 	case *parse.VarQuoteNode:
-		return w + p.WriteString("#'"+node.Val)
+		return w + p.writeString("#'"+node.Val)
 	case *parse.VectorNode:
 		style, ok := p.specialIndent[node]
 		if ok {
@@ -209,9 +209,9 @@ func (p *Printer) printNode(node parse.Node, w int) int {
 		} else {
 			style = IndentNormal
 		}
-		w += p.WriteString("[")
+		w += p.writeString("[")
 		w = p.printSequence(node.Nodes, w, style)
-		return w + p.WriteString("]")
+		return w + p.writeString("]")
 	default:
 		fmtErrf("%s: unhandled node type %T", node.Position(), node)
 	}
@@ -653,7 +653,7 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) in
 				}
 			}
 			w2 = w
-			p.WriteByte('\n')
+			p.writeByte('\n')
 			needIndent = true
 			needSpace = false
 			continue
@@ -677,10 +677,10 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) in
 			}
 		}
 		if needIndent {
-			p.WriteString(strings.Repeat(string(p.IndentChar), w))
+			p.writeString(strings.Repeat(string(p.IndentChar), w))
 		}
 		if needSpace {
-			w2 += p.WriteByte(' ')
+			w2 += p.writeByte(' ')
 		}
 		w2 = p.printNode(n, w2)
 		if i == 0 {
@@ -710,7 +710,7 @@ func (p *Printer) printSequence(nodes []parse.Node, w int, style IndentStyle) in
 	// We need to put in a trailing indent here; the next token cannot be a
 	// newline (it will need to be the closing delimiter for this sequence).
 	if needIndent {
-		p.WriteString(strings.Repeat(string(p.IndentChar), w))
+		p.writeString(strings.Repeat(string(p.IndentChar), w))
 	}
 	return w2
 }
@@ -729,22 +729,14 @@ type bufWriter struct {
 
 type bufErr struct{ error }
 
-func (bw *bufWriter) Write(b []byte) (int, error) {
-	n, err := bw.bw.Write(b)
-	if err != nil {
-		panic(bufErr{err})
-	}
-	return n, nil
-}
-
-func (bw *bufWriter) WriteString(s string) int {
+func (bw *bufWriter) writeString(s string) int {
 	n, err := bw.bw.WriteString(s)
 	if err != nil {
 		panic(bufErr{err})
 	}
 	return n
 }
-func (bw *bufWriter) WriteByte(b byte) int {
+func (bw *bufWriter) writeByte(b byte) int {
 	if err := bw.bw.WriteByte(b); err != nil {
 		panic(bufErr{err})
 	}

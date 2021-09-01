@@ -16,8 +16,7 @@ type Pos struct {
 }
 
 func (p *Pos) Copy() *Pos {
-	var p2 Pos
-	p2 = *p
+	p2 := *p
 	return &p2
 }
 
