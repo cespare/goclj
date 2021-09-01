@@ -1,0 +1,2 @@
+# Ensure the tests work on Windows by supressing CRs at line endings.
+*.clj text eol=lf
