@@ -126,6 +126,16 @@ func TestIssue41(t *testing.T) {
 	testChangeCustom(t, file, file, f)
 }
 
+func TestThreadFirstOverride(t *testing.T) {
+	const file = "custom/threadfirst.clj"
+	f := func(p *Printer) {
+		p.ThreadFirstStyleOverrides = map[string]ThreadFirstStyle{
+			"-?>": ThreadFirstNormal,
+		}
+	}
+	testChangeCustom(t, file, file, f)
+}
+
 func testFixture(t *testing.T, filename string) {
 	testChange(t, filename, filename)
 }

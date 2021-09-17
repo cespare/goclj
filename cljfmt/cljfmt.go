@@ -192,6 +192,7 @@ func (c *config) processFile(filename string, in io.Reader) error {
 	p := format.NewPrinter(&buf2)
 	p.IndentChar = ' '
 	p.IndentOverrides = c.indentOverrides
+	p.ThreadFirstStyleOverrides = c.threadFirstOverrides
 	p.Transforms = c.transforms
 	if err := p.PrintTree(t); err != nil {
 		return err
