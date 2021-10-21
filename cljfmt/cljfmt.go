@@ -37,7 +37,7 @@ type config struct {
 
 func main() {
 	log.SetFlags(0)
-	log.SetPrefix("clfmt: ")
+	log.SetPrefix("cljfmt: ")
 	var configFile pathFlag
 	if home, ok := os.LookupEnv("HOME"); ok {
 		configFile.p = filepath.Join(home, ".cljfmt")
