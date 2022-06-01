@@ -38,9 +38,8 @@ type config struct {
 func main() {
 	log.SetFlags(0)
 	log.SetPrefix("cljfmt: ")
-	var configFile pathFlag
-	if home, ok := os.LookupEnv("HOME"); ok {
-		configFile.p = filepath.Join(home, ".cljfmt")
+	configFile := pathFlag{
+		p: defaultConfigPath(),
 	}
 	conf := config{
 		transforms: make(map[format.Transform]bool),
@@ -83,6 +82,16 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+}
+
+func defaultConfigPath() string {
+	if path, ok := os.LookupEnv("CLJFMT_CONFIG_PATH"); ok {
+		return path
+	}
+	if home, ok := os.LookupEnv("HOME"); ok {
+		return filepath.Join(home, ".cljfmt")
+	}
+	return ""
 }
 
 type transformFlag struct {

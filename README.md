@@ -147,7 +147,13 @@ Use simple heuristics to remove some probably-unused :require statements:
 
 ## Cljfmt configuration
 
-You can optionally use a config file at `$HOME/.cljfmt` (override with `-c`).
+Cljfmt can optionally use a config file in one of these locations (in order
+of precedence):
+
+1. The path specified by the `-c` CLI argument
+2. The path specified by the `CLJFMT_CONFIG_PATH` environment variable
+3. `$HOME/.cljfmt`
+
 This is a Clojure file containing a single map of options. Here's an example:
 
 ```
