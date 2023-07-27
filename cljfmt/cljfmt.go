@@ -234,7 +234,7 @@ func (c *config) walkDir(path string) {
 		if strings.HasPrefix(name, ".") {
 			return nil
 		}
-		for _, ext := range []string{".clj", ".cljs", ".cljc"} {
+		for _, ext := range []string{".clj", ".cljs", ".cljc", ".edn"} {
 			if strings.HasSuffix(name, ext) {
 				return c.processFile(path, nil)
 			}
