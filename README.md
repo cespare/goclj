@@ -169,6 +169,14 @@ This is a Clojure file containing a single map of options. Here's an example:
 
 The configuration map may use the following keys:
 
+### :extensions
+
+This is a list of file extensions to format when cljfmt walks a directory.
+
+If not set, the default list of extensions is
+
+    (".clj" ".cljs" ".cljc" ".edn")
+
 ### :indent-overrides
 
 This is used to customize the indentation rules that cljfmt applies to

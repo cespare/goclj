@@ -28,6 +28,7 @@ See the goclj README for more documentation of the available transforms.`)
 }
 
 type config struct {
+	extensions           map[string]struct{}
 	indentOverrides      map[string]format.IndentStyle
 	threadFirstOverrides map[string]format.ThreadFirstStyle
 	transforms           map[format.Transform]bool
@@ -42,6 +43,12 @@ func main() {
 		p: defaultConfigPath(),
 	}
 	conf := config{
+		extensions: map[string]struct{}{
+			".clj":  {},
+			".cljs": {},
+			".cljc": {},
+			".edn":  {},
+		},
 		transforms: make(map[format.Transform]bool),
 	}
 	flag.Var(&configFile, "c", "path to config file")
@@ -234,10 +241,8 @@ func (c *config) walkDir(path string) {
 		if strings.HasPrefix(name, ".") {
 			return nil
 		}
-		for _, ext := range []string{".clj", ".cljs", ".cljc"} {
-			if strings.HasSuffix(name, ext) {
-				return c.processFile(path, nil)
-			}
+		if _, ok := c.extensions[filepath.Ext(name)]; ok {
+			return c.processFile(path, nil)
 		}
 		return nil // not a Clojure file
 	}

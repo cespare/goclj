@@ -45,6 +45,19 @@ func (c *config) parseDotConfig(r io.Reader, name string) error {
 			continue
 		}
 		switch sym.Val {
+		case ":extensions":
+			c.extensions = make(map[string]struct{})
+			seq, err := sequence(m.Nodes[i+1])
+			if err != nil {
+				return err
+			}
+			for _, n := range seq {
+				ext, err := stringNode(n)
+				if err != nil {
+					return err
+				}
+				c.extensions[ext] = struct{}{}
+			}
 		case ":indent-overrides", ":thread-first-overrides":
 			seq, err := sequence(m.Nodes[i+1])
 			if err != nil {
@@ -74,6 +87,8 @@ func (c *config) parseDotConfig(r io.Reader, name string) error {
 					c.threadFirstOverrides[k] = style
 				}
 			}
+		default:
+			return fmt.Errorf("unknown configuration key %q", sym.Val)
 		}
 	}
 	return nil
